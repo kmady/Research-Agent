@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-agent"
+version = "0.1.0"
+description = "Agent autonome de recherche documentaire avec un modèle open source local (Ollama)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "trafilatura>=1.12",
+    "pypdf>=4.0",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+web = ["fastapi>=0.115", "uvicorn>=0.30", "markdown-it-py>=3.0"]
+dev = ["pytest>=8.0", "fastapi>=0.115", "uvicorn>=0.30", "markdown-it-py>=3.0"]
+
+[project.scripts]
+research-agent = "research_agent.__main__:main"
+research-agent-web = "research_agent.web.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["research_agent*"]
+
+[tool.setuptools.package-data]
+"research_agent.web" = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

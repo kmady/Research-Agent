@@ -1,0 +1,132 @@
+# Jeu de questions de test (étape 8).
+# Catégories : facile (une source sérieuse suffit), multi (plusieurs aspects), controverse (sources en désaccord),
+# pointue (peu de sources), anglais (question en anglais).
+# 30 questions, 6 par catégorie, pour comparer les catégories entre elles.
+# `smoke: true` : sous-ensemble rapide, une question par catégorie.
+
+- id: cafeine
+  category: facile
+  smoke: true
+  question: Quels sont les effets de la caféine sur le sommeil ?
+
+- id: photosynthese
+  category: facile
+  question: Comment fonctionne la photosynthèse ?
+
+- id: abeilles
+  category: multi
+  smoke: true
+  question: Quelles sont les causes du déclin des abeilles ?
+
+- id: voiture-electrique
+  category: multi
+  question: Quel est le bilan carbone d'une voiture électrique comparé à une voiture thermique ?
+
+- id: glyphosate
+  category: controverse
+  smoke: true
+  question: Le glyphosate est-il cancérogène pour l'humain ?
+
+- id: edulcorants
+  category: controverse
+  question: L'aspartame présente-t-il un risque pour la santé ?
+
+- id: nucleaire-dechets
+  category: controverse
+  question: Le stockage géologique profond des déchets nucléaires est-il sûr ?
+
+- id: semaine-4-jours
+  category: pointue
+  smoke: true
+  question: Quels résultats a donné l'expérimentation de la semaine de quatre jours dans les collectivités territoriales françaises ?
+
+- id: zan-bretagne
+  category: pointue
+  question: Quel est l'effet de la loi Climat et Résilience sur l'artificialisation des sols en Bretagne ?
+
+- id: fission-fusion
+  category: anglais
+  smoke: true
+  question: What are the main differences between nuclear fission and fusion for energy production?
+
+- id: microplastics
+  category: anglais
+  question: What is known about the health effects of microplastics in humans?
+
+# --- Extension à 30 questions (6 par catégorie) ---
+
+- id: vitamine-d
+  category: facile
+  question: À quoi sert la vitamine D dans l'organisme ?
+
+- id: marees
+  category: facile
+  question: Comment se forment les marées ?
+
+- id: antibiotiques-virus
+  category: facile
+  question: Pourquoi les antibiotiques sont-ils inefficaces contre les virus ?
+
+- id: effet-serre
+  category: facile
+  question: Qu'est-ce que l'effet de serre et quels gaz y contribuent ?
+
+- id: teletravail
+  category: multi
+  question: Quels sont les effets du télétravail sur la productivité et le bien-être des salariés ?
+
+- id: pompe-chaleur
+  category: multi
+  question: Quels sont les avantages et les inconvénients d'une pompe à chaleur pour chauffer un logement ?
+
+- id: secheresse-agriculture
+  category: multi
+  question: Comment les sécheresses affectent-elles l'agriculture européenne et quelles adaptations sont envisagées ?
+
+- id: ia-emploi
+  category: multi
+  question: Quels effets l'intelligence artificielle générative a-t-elle sur l'emploi ?
+
+- id: ecrans-enfants
+  category: controverse
+  question: Les écrans nuisent-ils au développement des jeunes enfants ?
+
+- id: viande-rouge
+  category: controverse
+  question: La consommation de viande rouge augmente-t-elle le risque de cancer ?
+
+- id: homeopathie
+  category: controverse
+  question: L'homéopathie a-t-elle une efficacité supérieure au placebo ?
+
+- id: loup-france
+  category: pointue
+  question: Quel est l'effet des tirs de loups autorisés en France sur les attaques de troupeaux ?
+
+- id: tarification-sociale-eau
+  category: pointue
+  question: Quels enseignements a-t-on tirés de l'expérimentation de la tarification sociale de l'eau en France ?
+
+- id: zfe-lyon
+  category: pointue
+  question: Quel est l'effet de la zone à faibles émissions de Lyon sur la qualité de l'air ?
+
+- id: sargasses-antilles
+  category: pointue
+  question: Quels sont les effets sanitaires des échouements de sargasses aux Antilles ?
+
+- id: crispr
+  category: anglais
+  question: How does CRISPR-Cas9 gene editing work and what are its main limitations?
+
+- id: intermittent-fasting
+  category: anglais
+  question: Is intermittent fasting more effective than calorie restriction for weight loss?
+
+- id: lithium-mining
+  category: anglais
+  question: What are the environmental impacts of lithium mining?
+
+- id: sleep-memory
+  category: anglais
+  question: What role does sleep play in memory consolidation?

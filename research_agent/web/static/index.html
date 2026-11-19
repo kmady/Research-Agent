@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Research-Agent</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='13' r='8' fill='none' stroke='%232f5bd3' stroke-width='3'/%3E%3Cpath d='M19 19l8 8' stroke='%232f5bd3' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="static/style.css">
+  <script src="static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" id="brand">
+      <span class="brand-name">Research-Agent</span>
+      <span class="brand-sub">recherche documentaire autonome</span>
+    </a>
+    <div class="health" id="health" aria-live="polite">
+      <span class="pill" data-key="ollama"><i></i>Modèle</span>
+      <span class="pill" data-key="searxng"><i></i>Recherche</span>
+      <span class="pill neutral" id="queue-pill" hidden></span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <button class="btn primary block" id="new-btn" type="button">Nouvelle recherche</button>
+      <h2 class="side-title">Historique</h2>
+      <ul class="jobs" id="jobs"><li class="empty">Aucune recherche pour l'instant.</li></ul>
+    </aside>
+
+    <main class="main">
+      <section id="view-new" class="view">
+        <h1>Quelle est votre question ?</h1>
+        <p class="lead">L'agent planifie sa recherche, lit des sources sur le web, vérifie les affirmations,
+          puis rédige une synthèse où chaque phrase renvoie à une source. Il décide lui-même s'il doit chercher davantage.</p>
+        <form id="ask" class="card ask" autocomplete="off">
+          <label for="question" class="sr-only">Question</label>
+          <textarea id="question" name="question" rows="3" maxlength="500" required
+            placeholder="Ex. : Le glyphosate est-il cancérogène pour l'humain ?"></textarea>
+          <div class="ask-row">
+            <label class="field">Tours de recherche
+              <select id="max-rounds" name="max_rounds">
+                <option value="1">1 (rapide)</option>
+                <option value="2">2</option>
+                <option value="3" selected>3 (complet)</option>
+              </select>
+            </label>
+            <label class="check"><input type="checkbox" id="verify" name="verify" checked> Vérification croisée</label>
+            <span class="grow"></span>
+            <span class="counter" id="counter">0 / 500</span>
+            <button class="btn primary" type="submit" id="submit">Lancer la recherche</button>
+          </div>
+        </form>
+        <p class="hint">Durée habituelle : 6 à 8 minutes. Les recherches passent une par une (un seul GPU) ;
+          vous pouvez fermer la page, le résultat restera dans l'historique.</p>
+        <div class="examples" id="examples">
+          <span class="examples-label">Exemples :</span>
+          <button type="button" class="chip">Quels sont les effets de la caféine sur le sommeil ?</button>
+          <button type="button" class="chip">Quelles sont les causes du déclin des abeilles ?</button>
+          <button type="button" class="chip">What are the environmental impacts of lithium mining?</button>
+        </div>
+      </section>
+
+      <section id="view-job" class="view" hidden>
+        <div class="job-head">
+          <div class="job-title">
+            <span class="badge" id="job-status"></span>
+            <h1 id="job-question"></h1>
+            <p class="meta" id="job-meta"></p>
+          </div>
+          <div class="job-actions">
+            <button class="btn" type="button" id="cancel-btn" hidden>Annuler</button>
+            <button class="btn danger-ghost" type="button" id="delete-btn" hidden>Supprimer</button>
+          </div>
+        </div>
+
+        <div class="verdict" id="verdict" hidden></div>
+
+        <div class="progress" id="progress" hidden>
+          <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+          <span class="progress-label" id="progress-label"></span>
+        </div>
+
+        <details class="card timeline" id="timeline" open>
+          <summary>Déroulement <span class="count" id="event-count"></span></summary>
+          <ol class="events" id="events"></ol>
+        </details>
+
+        <div class="report-wrap" id="report-wrap" hidden>
+          <div class="report-bar">
+            <div class="tabs" role="tablist">
+              <button class="tab active" role="tab" data-view="report" type="button">Rapport</button>
+              <button class="tab" role="tab" data-view="details" type="button">Détail des affirmations</button>
+            </div>
+            <div class="downloads" id="downloads"></div>
+          </div>
+          <article class="card markdown" id="report"></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

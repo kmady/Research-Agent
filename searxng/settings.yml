@@ -1,0 +1,46 @@
+# Configuration SearXNG pour l'agent de recherche.
+# La clé secrète est lue depuis la variable d'environnement SEARXNG_SECRET (fichier .env).
+# Note : au démarrage, le conteneur attribue ce dossier à son utilisateur interne (uid 977).
+# Pour modifier ce fichier depuis l'hôte : docker cp <fichier> research_agent_searxng:/etc/searxng/settings.yml
+use_default_settings: true
+
+general:
+  instance_name: "research-agent"
+  # Wikipédia et Wikidata exigent une adresse de contact (politique Wikimedia) :
+  # définir SEARXNG_CONTACT_URL dans .env (ex. mailto:vous@exemple.org) pour les activer.
+
+server:
+  limiter: false        # instance locale, utilisée uniquement par l'agent
+  image_proxy: false
+
+search:
+  safe_search: 0
+  default_lang: "auto"
+  formats:
+    - html
+    - json              # indispensable : l'agent interroge /search?format=json
+
+outgoing:
+  request_timeout: 6.0      # 3 s par défaut : trop court quand la machine ou le réseau sont chargés
+  max_request_timeout: 10.0
+
+# Les moteurs gratuits (Google, Brave, DuckDuckGo, Qwant) bloquent l'adresse IP après un usage
+# intensif (CAPTCHA, « unusual traffic »), parfois pendant des heures. On multiplie donc les sources :
+#  - d'autres moteurs généralistes, moins sollicités ;
+#  - des bases scientifiques interrogées par API (catégorie « science »), qui ne bloquent pas ainsi.
+# Bing reste DÉSACTIVÉ : via SearXNG, il renvoie des résultats sans rapport quand les autres bloquent.
+# Startpage reste inactif : il impose un CAPTCHA à preuve de travail.
+engines:
+  - name: bing
+    disabled: true
+  - name: mojeek
+    inactive: false
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: openalex
+    disabled: false
+  - name: crossref
+    disabled: false

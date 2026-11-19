@@ -1,0 +1,34 @@
+version: "3.7"
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: research_agent_searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"   # accessible uniquement depuis la machine
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
+
+  web:
+    build: .
+    image: research-agent-web
+    container_name: research_agent_web
+    restart: unless-stopped
+    depends_on:
+      - searxng
+    # Réseau de l'hôte : le conteneur joint Ollama (localhost:11434) et SearXNG (localhost:8080)
+    # tels qu'ils tournent sur la machine, sans les exposer davantage.
+    network_mode: host
+    command: ["--host", "${RA_WEB_HOST:-127.0.0.1}"]
+    environment:
+      - RA_WEB_USER=${RA_WEB_USER:-admin}
+      - RA_WEB_PASSWORD=${RA_WEB_PASSWORD:-}
+      - RA_MAX_QUEUE=${RA_MAX_QUEUE:-10}
+      - RA_MODEL=${RA_MODEL:-qwen3:8b}
+      - RA_USER_AGENT=${RA_USER_AGENT:-research-agent/0.1 (local research tool)}
+    volumes:
+      - ./data:/data
