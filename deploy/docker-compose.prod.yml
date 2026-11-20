@@ -1,0 +1,68 @@
+# Research-Agent en production : web + SearXNG + Ollama (GPU), sur un réseau Docker privé.
+# Le même fichier sert au test local et sur l'instance EC2. Il ne construit rien :
+# il utilise des images déjà construites, désignées par les variables ci-dessous.
+#
+#   WEB_IMAGE      image du service web (en production : <ecr>/research-agent-web:<sha>)
+#   SEARXNG_IMAGE  image SearXNG avec settings.yml intégré
+#   DATA_ROOT      dossier persistant (en production : le volume EBS monté sur /data)
+#   WEB_BIND       adresse d'écoute du port 8000 sur l'hôte (127.0.0.1 en local, 0.0.0.0 sur EC2)
+#   WEB_PORT       port publié sur l'hôte (8000 par défaut)
+#   + les secrets SEARXNG_SECRET et RA_WEB_PASSWORD (fichier passé par --env-file)
+#
+# Lancement : docker compose --env-file <fichier .env> -f deploy/docker-compose.prod.yml up -d
+name: research-agent
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.16@sha256:910d0d8107b538fb0894e63163eb195de0cc7aefcbc666dc62d3b18f71124592
+    restart: unless-stopped
+    gpus: all
+    environment:
+      - OLLAMA_KEEP_ALIVE=30m        # garde le modèle en mémoire GPU entre deux recherches
+    volumes:
+      - ${DATA_ROOT:?DATA_ROOT manquant}/ollama:/root/.ollama   # modèles téléchargés une seule fois
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  searxng:
+    image: ${SEARXNG_IMAGE:?SEARXNG_IMAGE manquant}
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET manquant}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  web:
+    image: ${WEB_IMAGE:?WEB_IMAGE manquant}
+    restart: unless-stopped
+    command: ["--host", "0.0.0.0"]   # écoute dans le conteneur ; l'exposition est réglée par « ports »
+    depends_on:
+      ollama: { condition: service_healthy }
+      searxng: { condition: service_healthy }
+    environment:
+      - RA_OLLAMA_URL=http://ollama:11434
+      - RA_SEARXNG_URL=http://searxng:8080
+      - RA_WEB_USER=${RA_WEB_USER:-admin}
+      - RA_WEB_PASSWORD=${RA_WEB_PASSWORD:?RA_WEB_PASSWORD manquant}
+      - RA_MAX_QUEUE=${RA_MAX_QUEUE:-10}
+      - RA_MODEL=${RA_MODEL:-qwen3:8b}
+      - RA_USER_AGENT=${RA_USER_AGENT:-research-agent/0.1 (local research tool)}
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8000}:8000"   # le seul port publié
+    volumes:
+      - ${DATA_ROOT}/web:/data      # historique SQLite, rapports, cache des pages
+    networks: [backend]
+
+networks:
+  backend: {}
