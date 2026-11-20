@@ -83,7 +83,9 @@ def render_raw_report(state: ResearchState, meta: dict | None = None) -> str:
             continue
         for c in claims:
             line = f"- {STATUS_BADGE[c.status](c)} {c.statement} [{c.source_id}] `{', '.join(c.passage_ids)}`"
-            if c.status in ("confirmed", "contested") and (c.supporting_passage_ids or c.contradicting_passage_ids):
+            if c.status in ("confirmed", "contested") and (
+                c.supporting_passage_ids or c.contradicting_passage_ids
+            ):
                 parts = []
                 if c.supporting_passage_ids:
                     parts.append("appuyée par " + ", ".join(c.supporting_passage_ids))
@@ -102,8 +104,11 @@ def render_raw_report(state: ResearchState, meta: dict | None = None) -> str:
     for d in state.divergences:
         lines += [f"### {d['sub_question_id']} — {d['point']}", ""]
         for label, ids in (("D'un côté", d["side_a"]), ("De l'autre", d["side_b"])):
-            items = [f"{by_id[i].statement} [{by_id[i].source_id}, {reg.get(by_id[i].source_id).domain}]"
-                     for i in ids if i in by_id]
+            items = [
+                f"{by_id[i].statement} [{by_id[i].source_id}, {reg.get(by_id[i].source_id).domain}]"
+                for i in ids
+                if i in by_id
+            ]
             lines.append(f"- **{label}** : " + " ; ".join(items))
         lines += [f"- Analyse : {d['explanation']}", ""]
     if contested:
@@ -111,8 +116,13 @@ def render_raw_report(state: ResearchState, meta: dict | None = None) -> str:
             c = members[0]
             lines.append(f"### {c.id} — {c.statement}")
             lines.append("")
-            lines.append(f"- Affirmée par : {', '.join(sorted({reg.get(m.source_id).domain for m in members}))}")
-            for label, pids in (("Appui", c.supporting_passage_ids), ("Contradiction", c.contradicting_passage_ids)):
+            lines.append(
+                f"- Affirmée par : {', '.join(sorted({reg.get(m.source_id).domain for m in members}))}"
+            )
+            for label, pids in (
+                ("Appui", c.supporting_passage_ids),
+                ("Contradiction", c.contradicting_passage_ids),
+            ):
                 for pid in pids:
                     p = reg.get_passage(pid)
                     if p:
@@ -132,46 +142,71 @@ def render_raw_report(state: ResearchState, meta: dict | None = None) -> str:
             if r:
                 focus = f" — ciblé sur {', '.join(r['focus'])}" if r.get("focus") else ""
                 lines.append(f"- Requêtes{focus} : " + " · ".join(f"`{q}`" for q in r["queries"]))
-                lines.append(f"- Sources lues : {len(r['read'])} ({', '.join(r['read']) or 'aucune'}) ; "
-                             f"affirmations ajoutées : {r['claims_added']}")
+                lines.append(
+                    f"- Sources lues : {len(r['read'])} ({', '.join(r['read']) or 'aucune'}) ; "
+                    f"affirmations ajoutées : {r['claims_added']}"
+                )
             for v in d["verdicts"]:
                 mark = "✔" if v["covered"] else "✘"
-                lines.append(f"- {mark} **{v['sub_question_id']}** ({v['llm_status']}) : {'; '.join(v['reasons'])}")
+                lines.append(
+                    f"- {mark} **{v['sub_question_id']}** ({v['llm_status']}) : {'; '.join(v['reasons'])}"
+                )
             lines.append(f"- **Décision :** {d['reason']}")
             if not d["stop"]:
-                lines.append("- Requêtes complémentaires : " + " · ".join(f"`{q}`" for q in d["next_queries"]))
+                lines.append(
+                    "- Requêtes complémentaires : " + " · ".join(f"`{q}`" for q in d["next_queries"])
+                )
             lines.append("")
 
-    lines += ["## Sources", "", "| Id | Titre | Domaine | Type | Fiabilité | Date | Statut |",
-              "|---|---|---|---|---|---|---|"]
+    lines += [
+        "## Sources",
+        "",
+        "| Id | Titre | Domaine | Type | Fiabilité | Date | Statut |",
+        "|---|---|---|---|---|---|---|",
+    ]
     for s in reg.all():
         title = f"[{_cell(s.title[:80])}]({s.url})"
-        lines.append(f"| {s.id} | {title} | {s.domain} | {s.kind if s.fetched else ''} | "
-                     f"{s.reliability if s.fetched else ''} | {s.publication_date} | {_cell(_source_status(s))} |")
+        lines.append(
+            f"| {s.id} | {title} | {s.domain} | {s.kind if s.fetched else ''} | "
+            f"{s.reliability if s.fetched else ''} | {s.publication_date} | {_cell(_source_status(s))} |"
+        )
     lines.append("")
 
     if meta.get("llm"):
         st = meta["llm"]
-        lines += ["## Statistiques", "",
-                  f"- Appels au modèle : {st['calls']} (nouveaux essais : {st['retries']}, échecs : {st['failures']})",
-                  f"- Tokens : {st['prompt_tokens']} en entrée, {st['output_tokens']} en sortie",
-                  f"- Requêtes lancées : {len(state.queries_run)}",
-                  f"- Sources : {len(reg)} trouvées, {sum(s.fetched for s in reg.all())} lues",
-                  f"- Affirmations : {len(state.claims)} "
-                  f"(citations vérifiées : {sum(c.quote_verified for c in state.claims)})"]
+        lines += [
+            "## Statistiques",
+            "",
+            f"- Appels au modèle : {st['calls']} (nouveaux essais : {st['retries']}, échecs : {st['failures']})",
+            f"- Tokens : {st['prompt_tokens']} en entrée, {st['output_tokens']} en sortie",
+            f"- Requêtes lancées : {len(state.queries_run)}",
+            f"- Sources : {len(reg)} trouvées, {sum(s.fetched for s in reg.all())} lues",
+            f"- Affirmations : {len(state.claims)} "
+            f"(citations vérifiées : {sum(c.quote_verified for c in state.claims)})",
+        ]
         counts = Counter(c.status for c in state.claims)
         if any(k != "unchecked" for k in counts):
-            labels = [("corroborated", "corroborées"), ("confirmed", "confirmées"), ("contested", "contestées"),
-                      ("unverifiable", "invérifiables"), ("unchecked", "non vérifiées (budget)")]
-            lines.append("- Vérification : " + ", ".join(f"{counts[k]} {lab}" for k, lab in labels if counts[k]))
+            labels = [
+                ("corroborated", "corroborées"),
+                ("confirmed", "confirmées"),
+                ("contested", "contestées"),
+                ("unverifiable", "invérifiables"),
+                ("unchecked", "non vérifiées (budget)"),
+            ]
+            lines.append(
+                "- Vérification : " + ", ".join(f"{counts[k]} {lab}" for k, lab in labels if counts[k])
+            )
         lines.append("")
     return "\n".join(lines)
 
 
 def state_to_dict(state: ResearchState) -> dict:
     """Export complet et lisible de l'état ; seuls les passages cités gardent leur texte."""
-    cited = {pid for c in state.claims
-             for pid in (*c.passage_ids, *c.supporting_passage_ids, *c.contradicting_passage_ids)}
+    cited = {
+        pid
+        for c in state.claims
+        for pid in (*c.passage_ids, *c.supporting_passage_ids, *c.contradicting_passage_ids)
+    }
     sources = []
     for s in state.registry.all():
         d = asdict(s)
@@ -215,16 +250,22 @@ def _limits(state: ResearchState, syn) -> list[str]:
     counts = Counter(c.status for c in state.claims)
     single = counts["unchecked"] + counts["unverifiable"]
     if single:
-        out.append(f"{single} affirmation(s) sur {len(state.claims)} ne reposent que sur une seule source "
-                   f"(dont {counts['unverifiable']} non confirmée(s) ailleurs malgré une recherche).")
+        out.append(
+            f"{single} affirmation(s) sur {len(state.claims)} ne reposent que sur une seule source "
+            f"(dont {counts['unverifiable']} non confirmée(s) ailleurs malgré une recherche)."
+        )
     failed = [s for s in reg.all() if s.fetch_error]
     if failed:
         out.append(f"{len(failed)} source(s) n'ont pas pu être lues (accès refusé, robots.txt, format…).")
     if syn and syn.dropped_refs:
-        out.append(f"{len(syn.dropped_refs)} référence(s) proposées par le modèle ont été retirées "
-                   "car elles ne correspondaient à aucune source fournie.")
-    out.append("Rapport rédigé automatiquement par un modèle de langage local à partir des seules sources "
-               "listées : vérifiez les sources avant toute utilisation.")
+        out.append(
+            f"{len(syn.dropped_refs)} référence(s) proposées par le modèle ont été retirées "
+            "car elles ne correspondaient à aucune source fournie."
+        )
+    out.append(
+        "Rapport rédigé automatiquement par un modèle de langage local à partir des seules sources "
+        "listées : vérifiez les sources avant toute utilisation."
+    )
     return out
 
 
@@ -262,12 +303,23 @@ def render_final_report(state: ResearchState, meta: dict | None = None) -> str:
     lines += ["## Limites", ""] + [f"- {x}" for x in _limits(state, syn)] + [""]
 
     lines += ["## Sources", ""]
-    kind_fr = {"official": "officielle", "academic": "académique", "press": "presse", "encyclopedia": "encyclopédie",
-               "company": "entreprise", "blog": "blog", "other": "autre"}
+    kind_fr = {
+        "official": "officielle",
+        "academic": "académique",
+        "press": "presse",
+        "encyclopedia": "encyclopédie",
+        "company": "entreprise",
+        "blog": "blog",
+        "other": "autre",
+    }
     rel_fr = {"high": "haute", "medium": "moyenne", "low": "faible"}
     for sid in syn.cited_sources:
         s = reg.get(sid)
-        meta_parts = [s.domain, kind_fr.get(s.kind, s.kind), f"fiabilité {rel_fr.get(s.reliability, s.reliability)}"]
+        meta_parts = [
+            s.domain,
+            kind_fr.get(s.kind, s.kind),
+            f"fiabilité {rel_fr.get(s.reliability, s.reliability)}",
+        ]
         if s.publication_date:
             meta_parts.insert(1, s.publication_date)
         lines.append(f"{syn.numbers[sid]}. [{_cell(s.title)}]({s.url}) — {' · '.join(meta_parts)}")
@@ -290,6 +342,8 @@ def save_outputs(state: ResearchState, out_dir: str | Path, meta: dict | None = 
     paths.setdefault("Détail", paths["Rapport"])
     paths["Détail"].write_text(render_raw_report(state, meta), encoding="utf-8")
     paths["Trace"] = out / f"{stem}.trace.json"
-    paths["Trace"].write_text(json.dumps({"meta": meta or {}, **state_to_dict(state)}, ensure_ascii=False, indent=2),
-                              encoding="utf-8")
+    paths["Trace"].write_text(
+        json.dumps({"meta": meta or {}, **state_to_dict(state)}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     return paths

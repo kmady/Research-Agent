@@ -28,7 +28,7 @@ log = logging.getLogger("research_agent")
 # [S3] [S3:p2] [C12] [S3, S5] [S3; C4] …
 _REF_BLOCK = re.compile(r"\[((?:\s*(?:S\d+(?::p\d+)?|C\d+)\s*[,;]?)+)\]")
 _REF_ID = re.compile(r"S\d+(?::p\d+)?|C\d+")
-_CLAIM_ID = re.compile(r"(?<![\w\[])C\d+\b")   # « C6 » nu dans un texte du modèle
+_CLAIM_ID = re.compile(r"(?<![\w\[])C\d+\b")  # « C6 » nu dans un texte du modèle
 
 STATUS_LABEL = {
     "corroborated": "corroborée par plusieurs sources",
@@ -45,7 +45,7 @@ class CitationMapper:
 
     def __init__(self, state: ResearchState) -> None:
         self.state = state
-        self.numbers: dict[str, int] = {}          # S3 → 1
+        self.numbers: dict[str, int] = {}  # S3 → 1
         self.claim_source = {c.id: c.source_id for c in state.claims}
         self.dropped: list[str] = []
 
@@ -75,7 +75,7 @@ class CitationMapper:
             return "".join(f"[{n}]" for n in out)
 
         text = _REF_BLOCK.sub(repl, text)
-        text = re.sub(r"(\[\d+\])(?:\s*,?\s*\1)+", r"\1", text)   # « [4], [4] » → « [4] »
+        text = re.sub(r"(\[\d+\])(?:\s*,?\s*\1)+", r"\1", text)  # « [4], [4] » → « [4] »
         return re.sub(r"[ \t]+([.,;:])", r"\1", re.sub(r"[ \t]{2,}", " ", text)).strip()
 
     def cited_sources(self) -> list[str]:
@@ -95,7 +95,9 @@ def usable_claims(state: ResearchState, sq_id: str, limit: int = 15) -> list[Cla
             continue
         out.append(c)
     rel_rank = {"high": 0, "medium": 1, "low": 2}
-    out.sort(key=lambda c: (_STATUS_ORDER[c.status], rel_rank[reg.get(c.source_id).reliability], int(c.id[1:])))
+    out.sort(
+        key=lambda c: (_STATUS_ORDER[c.status], rel_rank[reg.get(c.source_id).reliability], int(c.id[1:]))
+    )
     # Un seul représentant par groupe d'affirmations équivalentes (les autres sources restent citables).
     seen_groups, unique = set(), []
     for c in out:
@@ -126,9 +128,9 @@ def _clean_section(text: str) -> str:
 @dataclass
 class Synthesis:
     short_answer: str = ""
-    sections: dict[str, str] = field(default_factory=dict)       # Q1 → texte avec [n]
-    divergences: list[dict] = field(default_factory=list)        # divergences avec refs numérotées
-    cited_sources: list[str] = field(default_factory=list)       # S-ids dans l'ordre des numéros
+    sections: dict[str, str] = field(default_factory=dict)  # Q1 → texte avec [n]
+    divergences: list[dict] = field(default_factory=list)  # divergences avec refs numérotées
+    cited_sources: list[str] = field(default_factory=list)  # S-ids dans l'ordre des numéros
     numbers: dict[str, int] = field(default_factory=dict)
     dropped_refs: list[str] = field(default_factory=list)
     failed_sections: list[str] = field(default_factory=list)
@@ -140,8 +142,9 @@ class Synthesizer:
         self.llm = agent.llm
 
     def _chat(self, user: str) -> str:
-        return self.llm.chat([{"role": "system", "content": prompts.SYSTEM}, {"role": "user", "content": user}],
-                             think=False)
+        return self.llm.chat(
+            [{"role": "system", "content": prompts.SYSTEM}, {"role": "user", "content": user}], think=False
+        )
 
     def _section_input(self, state: ResearchState, sq) -> tuple[str, str, set[str]]:
         reg = state.registry
@@ -182,7 +185,9 @@ class Synthesizer:
                 raw_sections[sq.id] = ("", set())
                 continue
             try:
-                text = self._chat(prompts.section_prompt(state.question, sq.id, sq.question, claims_text, div_text))
+                text = self._chat(
+                    prompts.section_prompt(state.question, sq.id, sq.question, claims_text, div_text)
+                )
             except LLMError as exc:
                 log.warning("  rédaction de %s en échec : %s", sq.id, exc)
                 syn.failed_sections.append(sq.id)
@@ -193,8 +198,11 @@ class Synthesizer:
 
         # Réponse courte à partir des sections (références encore au format S3).
         all_allowed = set().union(*(a for _, a in raw_sections.values())) if raw_sections else set()
-        body = "\n\n".join(f"{sq.id} — {sq.question}\n{raw_sections[sq.id][0]}"
-                           for sq in state.plan.sub_questions if raw_sections[sq.id][0])
+        body = "\n\n".join(
+            f"{sq.id} — {sq.question}\n{raw_sections[sq.id][0]}"
+            for sq in state.plan.sub_questions
+            if raw_sections[sq.id][0]
+        )
         if body:
             try:
                 short = self._chat(prompts.short_answer_prompt(state.question, body))
@@ -210,17 +218,28 @@ class Synthesizer:
         for d in state.divergences:
             sides = {}
             for key in ("side_a", "side_b"):
-                sides[key] = [(by_id[c].statement, mapper.number(by_id[c].source_id)) for c in d[key] if c in by_id]
+                sides[key] = [
+                    (by_id[c].statement, mapper.number(by_id[c].source_id)) for c in d[key] if c in by_id
+                ]
             explanation = _CLAIM_ID.sub(lambda m: f"[{m.group(0)}]", d["explanation"])
             allowed = {by_id[c].source_id for key in ("side_a", "side_b") for c in d[key] if c in by_id}
-            syn.divergences.append({**d, "rendered": sides, "explanation": mapper.render(explanation, allowed)})
+            syn.divergences.append(
+                {**d, "rendered": sides, "explanation": mapper.render(explanation, allowed)}
+            )
 
         syn.cited_sources = mapper.cited_sources()
         syn.numbers = dict(mapper.numbers)
         syn.dropped_refs = mapper.dropped
         if mapper.dropped:
-            log.info("  références retirées (non fournies au modèle) : %s", ", ".join(sorted(set(mapper.dropped))))
+            log.info(
+                "  références retirées (non fournies au modèle) : %s", ", ".join(sorted(set(mapper.dropped)))
+            )
         state.synthesis = syn
-        state.log("synthesis", sections={k: len(v) for k, v in syn.sections.items()},
-                  cited=syn.cited_sources, dropped_refs=syn.dropped_refs, failed=syn.failed_sections)
+        state.log(
+            "synthesis",
+            sections={k: len(v) for k, v in syn.sections.items()},
+            cited=syn.cited_sources,
+            dropped_refs=syn.dropped_refs,
+            failed=syn.failed_sections,
+        )
         return syn

@@ -1,7 +1,7 @@
 """Ligne de commande.
 
-    python -m research_agent "Quels sont les effets de la caféine sur le sommeil ?"
-    python -m research_agent "..." --out reports/ --no-cache -v
+python -m research_agent "Quels sont les effets de la caféine sur le sommeil ?"
+python -m research_agent "..." --out reports/ --no-cache -v
 """
 
 from __future__ import annotations
@@ -23,23 +23,33 @@ from .report import save_outputs  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="research-agent", description="Agent autonome de recherche documentaire")
+    ap = argparse.ArgumentParser(
+        prog="research-agent", description="Agent autonome de recherche documentaire"
+    )
     ap.add_argument("question", help="la question de recherche")
     ap.add_argument("--out", default="reports", help="dossier de sortie (défaut : reports/)")
     ap.add_argument("--model", default=None, help=f"modèle Ollama (défaut : {CONFIG.model})")
-    ap.add_argument("--max-rounds", type=int, default=None,
-                    help=f"nombre maximal de tours de recherche (défaut : {CONFIG.max_rounds})")
+    ap.add_argument(
+        "--max-rounds",
+        type=int,
+        default=None,
+        help=f"nombre maximal de tours de recherche (défaut : {CONFIG.max_rounds})",
+    )
     ap.add_argument("--no-synthesis", action="store_true", help="sans synthèse rédigée (rapport brut seul)")
     ap.add_argument("--no-verify", action="store_true", help="sauter la vérification croisée (plus rapide)")
     ap.add_argument("--no-cache", action="store_true", help="ignorer le cache de recherche et de pages")
     ap.add_argument("-v", "--verbose", action="store_true", help="journal détaillé")
     args = ap.parse_args(argv)
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s %(message)s", datefmt="%H:%M:%S", stream=sys.stderr)
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+    )
     for noisy in ("httpx", "httpcore", "trafilatura", "htmldate", "charset_normalizer"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    logging.getLogger("pypdf").setLevel(logging.ERROR)   # avertissements de structure PDF sans conséquence
+    logging.getLogger("pypdf").setLevel(logging.ERROR)  # avertissements de structure PDF sans conséquence
 
     overrides = {}
     if args.model:
@@ -64,7 +74,9 @@ def main(argv: list[str] | None = None) -> int:
     for label, path in paths.items():
         print(f"{label:<8}: {path}")
     if "moteur de recherche indisponible" in state.stop_reason:
-        logging.error("Recherche impossible : les moteurs de SearXNG sont bloqués ou injoignables. Réessayez plus tard.")
+        logging.error(
+            "Recherche impossible : les moteurs de SearXNG sont bloqués ou injoignables. Réessayez plus tard."
+        )
         return 2
     return 0
 

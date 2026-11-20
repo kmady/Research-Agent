@@ -5,12 +5,15 @@ from research_agent.fetch import Fetcher, chunk_text, extract_html, rank_passage
 
 ARTICLE = (
     "<html><head><title>Titre</title></head><body><article><h1>La photosynthèse</h1>"
-    + "".join(f"<p>{'Paragraphe numéro %d qui explique un aspect du sujet en détail. ' % i * 4}</p>" for i in range(6))
+    + "".join(
+        f"<p>{f'Paragraphe numéro {i} qui explique un aspect du sujet en détail. ' * 4}</p>" for i in range(6)
+    )
     + "</article></body></html>"
 )
 
 
 # --- Découpage ---------------------------------------------------------------
+
 
 def test_chunks_respect_max_size_and_never_cut_words():
     words = [f"mot{i}" for i in range(2000)]
@@ -54,8 +57,10 @@ def test_single_short_text_is_kept():
 
 # --- Classement --------------------------------------------------------------
 
+
 class FakeEmbedder:
     """Embedding jouet : compte des mots-clés, suffisant pour tester le classement."""
+
     KEYS = ["plante", "soleil", "voiture"]
 
     def _vec(self, text):
@@ -81,6 +86,7 @@ def test_rank_passages_empty():
 
 # --- Extraction et téléchargement -------------------------------------------
 
+
 def test_extract_html_returns_main_text():
     title, _, text = extract_html(ARTICLE.encode(), "https://a.org/x")
     assert "Paragraphe numéro 3" in text
@@ -91,9 +97,11 @@ def make_fetcher(routes, tmp_path=None, **kw):
     def handler(request):
         resp = routes.get(str(request.url))
         return resp() if callable(resp) else (resp or httpx.Response(404))
+
     cache = DiskCache(tmp_path, "pages") if tmp_path else None
-    return Fetcher(user_agent="test", cache=cache,
-                   client=httpx.Client(transport=httpx.MockTransport(handler)), **kw)
+    return Fetcher(
+        user_agent="test", cache=cache, client=httpx.Client(transport=httpx.MockTransport(handler)), **kw
+    )
 
 
 def html_response():
@@ -122,8 +130,13 @@ def test_fetch_http_error_is_reported_not_raised():
 
 def test_fetch_respects_robots_txt():
     robots = httpx.Response(200, text="User-agent: *\nDisallow: /prive/\n")
-    fetcher = make_fetcher({"https://a.org/robots.txt": robots, "https://a.org/prive/x": html_response,
-                            "https://a.org/public": html_response})
+    fetcher = make_fetcher(
+        {
+            "https://a.org/robots.txt": robots,
+            "https://a.org/prive/x": html_response,
+            "https://a.org/public": html_response,
+        }
+    )
     assert fetcher.fetch("https://a.org/prive/x").error == "interdit par robots.txt"
     assert fetcher.fetch("https://a.org/public").ok
 
@@ -137,6 +150,8 @@ def test_fetch_rejects_unsupported_type_and_oversized_pages():
 
 
 def test_fetch_rejects_pages_with_too_little_text():
-    empty = httpx.Response(200, headers={"content-type": "text/html"}, content=b"<html><body><p>Hi</p></body></html>")
+    empty = httpx.Response(
+        200, headers={"content-type": "text/html"}, content=b"<html><body><p>Hi</p></body></html>"
+    )
     fetcher = make_fetcher({"https://a.org/e": empty})
     assert fetcher.fetch("https://a.org/e").error == "texte extrait trop court"

@@ -17,10 +17,19 @@ def make_llm(responses, **kw):
         body = json.loads(request.content)
         sent.append(body)
         content, reason = responses[min(len(sent) - 1, len(responses) - 1)]
-        return httpx.Response(200, json={"message": {"role": "assistant", "content": content},
-                                         "done_reason": reason, "prompt_eval_count": 100, "eval_count": 20})
+        return httpx.Response(
+            200,
+            json={
+                "message": {"role": "assistant", "content": content},
+                "done_reason": reason,
+                "prompt_eval_count": 100,
+                "eval_count": 20,
+            },
+        )
 
-    llm = OllamaLLM("http://ollama.test", "m", client=httpx.Client(transport=httpx.MockTransport(handler)), **kw)
+    llm = OllamaLLM(
+        "http://ollama.test", "m", client=httpx.Client(transport=httpx.MockTransport(handler)), **kw
+    )
     return llm, sent
 
 
@@ -36,8 +45,8 @@ def test_structured_valid_first_try_and_payload():
     assert body["think"] is True and body["stream"] is False
     assert body["format"] == ResearchPlan.model_json_schema()
     assert body["options"]["num_ctx"] == 8192
-    assert "schéma JSON" in body["messages"][-1]["content"]       # le schéma est montré au modèle
-    assert body["messages"][0]["content"] == "sys"                  # le message système n'est pas modifié
+    assert "schéma JSON" in body["messages"][-1]["content"]  # le schéma est montré au modèle
+    assert body["messages"][0]["content"] == "sys"  # le message système n'est pas modifié
     assert llm.stats.calls == 1 and llm.stats.prompt_tokens == 100
 
 
@@ -83,12 +92,15 @@ def test_chat_truncated_raises():
 def test_http_error_is_wrapped():
     def handler(request):
         return httpx.Response(500)
+
     llm = OllamaLLM("http://ollama.test", "m", client=httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(LLMError):
         llm.chat(user())
 
 
-@pytest.mark.parametrize("schema", [ResearchPlan, UrlSelection, Extraction, SubQuestionAssessment, ClaimVerdict])
+@pytest.mark.parametrize(
+    "schema", [ResearchPlan, UrlSelection, Extraction, SubQuestionAssessment, ClaimVerdict]
+)
 def test_schemas_are_flat_enough(schema):
     """Garde-fou : au plus un niveau d'objets imbriqués (lisible par un modèle 8B)."""
     s = schema.model_json_schema()

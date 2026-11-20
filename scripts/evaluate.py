@@ -87,12 +87,24 @@ def metrics(state, agent, seconds: float) -> dict:
     }
 
 
-COLUMNS = [("id", "Question"), ("category", "Catégorie"), ("seconds", "Durée (s)"), ("rounds", "Tours"),
-           ("sufficient", "Suffisant"), ("reliable_read", "Sources fiables lues"), ("claims", "Affirm."),
-           ("quotes_verified_pct", "Citations vérif. %"), ("corroborated", "Corrob."), ("confirmed", "Confirm."),
-           ("contested", "Contest."), ("divergences", "Diverg."), ("cited_sources", "Réf."),
-           ("cited_sentences_pct", "Phrases citées %"), ("dropped_refs", "Réf. retirées"),
-           ("llm_failures", "Échecs LLM")]
+COLUMNS = [
+    ("id", "Question"),
+    ("category", "Catégorie"),
+    ("seconds", "Durée (s)"),
+    ("rounds", "Tours"),
+    ("sufficient", "Suffisant"),
+    ("reliable_read", "Sources fiables lues"),
+    ("claims", "Affirm."),
+    ("quotes_verified_pct", "Citations vérif. %"),
+    ("corroborated", "Corrob."),
+    ("confirmed", "Confirm."),
+    ("contested", "Contest."),
+    ("divergences", "Diverg."),
+    ("cited_sources", "Réf."),
+    ("cited_sentences_pct", "Phrases citées %"),
+    ("dropped_refs", "Réf. retirées"),
+    ("llm_failures", "Échecs LLM"),
+]
 CATEGORIES = ["facile", "multi", "controverse", "pointue", "anglais"]
 
 
@@ -106,6 +118,7 @@ def aggregate(rs: list[dict]) -> dict:
 
     def avg(k):
         return sum(r["metrics"][k] for r in rs) / n
+
     return {
         "n": n,
         "minutes": avg("seconds") / 60,
@@ -120,8 +133,12 @@ def aggregate(rs: list[dict]) -> dict:
 
 
 def write_summary(results: list[dict], out_dir: Path, model: str) -> Path:
-    lines = [f"# Évaluation — {datetime.now():%Y-%m-%d %H:%M} — modèle `{model}`", "",
-             "| " + " | ".join(h for _, h in COLUMNS) + " |", "|" + "---|" * len(COLUMNS)]
+    lines = [
+        f"# Évaluation — {datetime.now():%Y-%m-%d %H:%M} — modèle `{model}`",
+        "",
+        "| " + " | ".join(h for _, h in COLUMNS) + " |",
+        "|" + "---|" * len(COLUMNS),
+    ]
     for r in results:
         if "error" in r or r["metrics"].get("search_outage"):
             why = f"échec : {r['error']}" if "error" in r else "panne des moteurs de recherche (non comptée)"
@@ -137,31 +154,44 @@ def write_summary(results: list[dict], out_dir: Path, model: str) -> Path:
     excluded = len(results) - len(ok)
     if ok:
         g = aggregate(ok)
-        lines += ["", f"## Moyennes ({g['n']} questions exploitables, {excluded} exclues)", "",
-                  f"- Durée : {g['minutes']:.1f} min par question ; tours : {g['rounds']:.1f}",
-                  f"- Couverture jugée suffisante : {g['sufficient']}/{g['n']}",
-                  f"- Citations vérifiées : {g['quotes_verified_pct']:.0f} % ; "
-                  f"phrases de la synthèse avec référence : {g['cited_sentences_pct']:.0f} %",
-                  f"- Références retirées (inventées par le modèle) : {g['dropped_refs']:.1f} par rapport",
-                  f"- Échecs d'appel au modèle : {g['llm_failures']}",
-                  "", "## Par catégorie", "",
-                  "| Catégorie | Questions | Suffisant | Tours | Phrases citées % | Citations vérif. % "
-                  "| Avec divergence | Durée (min) |",
-                  "|---|---|---|---|---|---|---|---|"]
+        lines += [
+            "",
+            f"## Moyennes ({g['n']} questions exploitables, {excluded} exclues)",
+            "",
+            f"- Durée : {g['minutes']:.1f} min par question ; tours : {g['rounds']:.1f}",
+            f"- Couverture jugée suffisante : {g['sufficient']}/{g['n']}",
+            f"- Citations vérifiées : {g['quotes_verified_pct']:.0f} % ; "
+            f"phrases de la synthèse avec référence : {g['cited_sentences_pct']:.0f} %",
+            f"- Références retirées (inventées par le modèle) : {g['dropped_refs']:.1f} par rapport",
+            f"- Échecs d'appel au modèle : {g['llm_failures']}",
+            "",
+            "## Par catégorie",
+            "",
+            "| Catégorie | Questions | Suffisant | Tours | Phrases citées % | Citations vérif. % "
+            "| Avec divergence | Durée (min) |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
         for cat in CATEGORIES + sorted({r["category"] for r in ok} - set(CATEGORIES)):
             rs = [r for r in ok if r["category"] == cat]
             if not rs:
                 continue
             c = aggregate(rs)
-            lines.append(f"| {cat} | {c['n']} | {c['sufficient']}/{c['n']} | {c['rounds']:.1f} "
-                         f"| {c['cited_sentences_pct']:.0f} | {c['quotes_verified_pct']:.0f} "
-                         f"| {c['with_divergence']}/{c['n']} | {c['minutes']:.1f} |")
-        lines += ["", "Attendu : « controverse » avec divergences ; « pointue » plus souvent jugée insuffisante "
-                  "(l'agent doit le dire plutôt que combler le vide)."]
+            lines.append(
+                f"| {cat} | {c['n']} | {c['sufficient']}/{c['n']} | {c['rounds']:.1f} "
+                f"| {c['cited_sentences_pct']:.0f} | {c['quotes_verified_pct']:.0f} "
+                f"| {c['with_divergence']}/{c['n']} | {c['minutes']:.1f} |"
+            )
+        lines += [
+            "",
+            "Attendu : « controverse » avec divergences ; « pointue » plus souvent jugée insuffisante "
+            "(l'agent doit le dire plutôt que combler le vide).",
+        ]
     lines.append("")
     path = out_dir / "RESULTATS.md"
     path.write_text("\n".join(lines), encoding="utf-8")
-    (out_dir / "RESULTATS.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / "RESULTATS.json").write_text(
+        json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return path
 
 
@@ -196,10 +226,12 @@ def main() -> int:
     if args.resume:
         out_dir = args.resume if args.resume.is_absolute() else ROOT / args.resume
         previous = json.loads((out_dir / "RESULTATS.json").read_text(encoding="utf-8"))
-        results = [r for r in previous if is_valid(r)]          # on garde ce qui est exploitable
+        results = [r for r in previous if is_valid(r)]  # on garde ce qui est exploitable
         done = {r["id"] for r in results}
         questions = [q for q in questions if q["id"] not in done]
-        logging.info("reprise de %s : %d questions déjà faites, %d à lancer", out_dir.name, len(done), len(questions))
+        logging.info(
+            "reprise de %s : %d questions déjà faites, %d à lancer", out_dir.name, len(done), len(questions)
+        )
     else:
         out_dir = ROOT / "eval" / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{cfg.model.replace(':', '_')}"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -222,12 +254,16 @@ def main() -> int:
         m = metrics(state, agent, seconds)
         results.append({**q, "metrics": m, "report": str(paths["Rapport"].relative_to(ROOT))})
         logging.info("      → %s", json.dumps(m, ensure_ascii=False))
-        write_summary(results, out_dir, cfg.model)   # écrit après chaque question : rien n'est perdu
+        write_summary(results, out_dir, cfg.model)  # écrit après chaque question : rien n'est perdu
         outages = outages + 1 if m["search_outage"] else 0
         if outages >= MAX_CONSECUTIVE_OUTAGES:
             rel = out_dir.relative_to(ROOT)
-            logging.error("%d pannes consécutives des moteurs de recherche : arrêt. "
-                          "Relancer plus tard avec : python scripts/evaluate.py --resume %s", outages, rel)
+            logging.error(
+                "%d pannes consécutives des moteurs de recherche : arrêt. "
+                "Relancer plus tard avec : python scripts/evaluate.py --resume %s",
+                outages,
+                rel,
+            )
             print(f"Résultats partiels : {out_dir / 'RESULTATS.md'}")
             return 2
 

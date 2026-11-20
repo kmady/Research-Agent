@@ -133,7 +133,9 @@ class OllamaLLM:
             raise LLMError("réponse tronquée (limite de tokens de sortie atteinte)")
         return content
 
-    def structured(self, messages: list[dict], schema: type[T], *, think: bool = False, retries: int = 1) -> T:
+    def structured(
+        self, messages: list[dict], schema: type[T], *, think: bool = False, retries: int = 1
+    ) -> T:
         """Appel avec sortie JSON contrainte par `schema`, validée par Pydantic.
 
         En cas de JSON invalide : nouvel essai en montrant l'erreur au modèle.
@@ -162,8 +164,13 @@ class OllamaLLM:
                 msgs = [
                     *msgs,
                     {"role": "assistant", "content": content[:2000]},
-                    {"role": "user", "content": f"Ce JSON est invalide ({exc.errors()[:3]}). "
-                                                "Renvoie uniquement le JSON corrigé, conforme au schéma."},
+                    {
+                        "role": "user",
+                        "content": f"Ce JSON est invalide ({exc.errors()[:3]}). "
+                        "Renvoie uniquement le JSON corrigé, conforme au schéma.",
+                    },
                 ]
         self.stats.failures += 1
-        raise LLMError(f"sortie JSON invalide pour {schema.__name__} après {retries + 1} essai(s) : {last_error}")
+        raise LLMError(
+            f"sortie JSON invalide pour {schema.__name__} après {retries + 1} essai(s) : {last_error}"
+        )

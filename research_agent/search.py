@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Protocol
 from urllib.parse import urlsplit
 
-import logging
-
 import httpx
 
 from .cache import DiskCache
 from .state import normalize_url
-
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +62,9 @@ class SearxngProvider:
 
     def _raw_results(self, query: str, categories: str) -> list[dict]:
         # Clé de cache inchangée pour « general » : les résultats déjà en cache restent valables.
-        key = f"{self.language}|{query}" if categories == "general" else f"{self.language}|{categories}|{query}"
+        key = (
+            f"{self.language}|{query}" if categories == "general" else f"{self.language}|{categories}|{query}"
+        )
         if self.cache and (cached := self.cache.get(key)) is not None:
             return cached
         wait = self.min_interval_s - (time.monotonic() - self._last_request)
@@ -86,7 +86,9 @@ class SearxngProvider:
         if not results and failing:
             # SearXNG répond 200 avec 0 résultat quand les moteurs bloquent (CAPTCHA, délai) :
             # ce n'est pas « rien trouvé », c'est une panne — on la signale comme telle.
-            names = ", ".join(f"{e[0]} ({e[1]})" if isinstance(e, list) and len(e) > 1 else str(e) for e in failing)
+            names = ", ".join(
+                f"{e[0]} ({e[1]})" if isinstance(e, list) and len(e) > 1 else str(e) for e in failing
+            )
             raise SearchError(f"moteurs de recherche indisponibles pour « {query} » : {names}")
         if self.cache and results:  # on ne met pas en cache une réponse vide
             self.cache.set(key, results)
@@ -108,8 +110,12 @@ class SearxngProvider:
         except SearchError:
             backup = []
         if backup:
-            log.info("  « %s » : moteurs généralistes %s, résultats pris dans « %s »", query,
-                     "indisponibles" if error else "sans résultat", self.fallback_categories)
+            log.info(
+                "  « %s » : moteurs généralistes %s, résultats pris dans « %s »",
+                query,
+                "indisponibles" if error else "sans résultat",
+                self.fallback_categories,
+            )
             return backup
         if error:
             raise error
@@ -127,13 +133,15 @@ class SearxngProvider:
             if key in seen:
                 continue
             seen.add(key)
-            hits.append(SearchHit(
-                url=url,
-                title=(item.get("title") or "").strip(),
-                snippet=(item.get("content") or "").strip(),
-                engines=list(item.get("engines") or []),
-                published_date=item.get("publishedDate") or "",
-            ))
+            hits.append(
+                SearchHit(
+                    url=url,
+                    title=(item.get("title") or "").strip(),
+                    snippet=(item.get("content") or "").strip(),
+                    engines=list(item.get("engines") or []),
+                    published_date=item.get("publishedDate") or "",
+                )
+            )
             if len(hits) >= n:
                 break
         return hits

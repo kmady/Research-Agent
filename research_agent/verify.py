@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("research_agent")
 
+
 def heuristic_reliability(domain: str) -> tuple[str, str]:
     """(type, fiabilité) d'une source lue seulement pour vérifier, donc sans appréciation par le modèle."""
     return domain_kind(domain) or ("other", "medium")
@@ -44,7 +45,9 @@ def _unit(vectors: list[list[float]]) -> np.ndarray:
 
 _HEDGES = re.compile(
     r"\b(probabl\w*|possibl\w*|peut|peuvent|pourrai\w*|pourrait|semble\w*|susceptible\w*|risque\w*|"
-    r"suspect\w*|potentiel\w*|may|might|could|likely|possibly|probably|suggest\w*)\b", re.IGNORECASE)
+    r"suspect\w*|potentiel\w*|may|might|could|likely|possibly|probably|suggest\w*)\b",
+    re.IGNORECASE,
+)
 _NEGATIONS = re.compile(r"\b(ne|n'|n’|pas|aucun\w*|jamais|sans|not|no|never|none)\b", re.IGNORECASE)
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
@@ -77,8 +80,9 @@ def group_claims(claims: list[Claim], vectors: list[list[float]], threshold: flo
         best, best_sim = None, threshold
         for g in groups:
             head = g[0]
-            if claims[head].sub_question_id != c.sub_question_id or not compatible(claims[head].statement,
-                                                                                    c.statement):
+            if claims[head].sub_question_id != c.sub_question_id or not compatible(
+                claims[head].statement, c.statement
+            ):
                 continue
             sim = float(V[i] @ V[head])
             if sim >= best_sim:
@@ -90,7 +94,9 @@ def group_claims(claims: list[Claim], vectors: list[list[float]], threshold: flo
     return groups
 
 
-def count_independent_origins(members: list[Claim], state: ResearchState, embed_docs, dup_threshold: float) -> int:
+def count_independent_origins(
+    members: list[Claim], state: ResearchState, embed_docs, dup_threshold: float
+) -> int:
     """Nombre d'origines fiables indépendantes : domaines distincts, reprises d'un même texte fusionnées."""
     reg = state.registry
     by_domain: dict[str, list[str]] = {}
@@ -151,8 +157,9 @@ class Verifier:
         vectors = self.embedder.embed_documents([c.statement for c in claims])
         groups = [[claims[i] for i in g] for g in group_claims(claims, vectors, self.cfg.claim_similarity)]
         for n, members in enumerate(groups, start=1):
-            origins = count_independent_origins(members, state, self.embedder.embed_documents,
-                                                self.cfg.duplicate_passage_similarity)
+            origins = count_independent_origins(
+                members, state, self.embedder.embed_documents, self.cfg.duplicate_passage_similarity
+            )
             for c in members:
                 c.group_id = f"G{n}"
                 c.independent_origins = origins
@@ -175,11 +182,16 @@ class Verifier:
     def _own_passages(self, members: list[Claim], state: ResearchState) -> list[Passage]:
         return [p for c in members for pid in c.passage_ids if (p := state.registry.get_passage(pid))]
 
-    def _evidence_from_corpus(self, state: ResearchState, claim: Claim, excluded_domains: set[str],
-                              own: list[Passage]) -> list[tuple[Passage, float]]:
+    def _evidence_from_corpus(
+        self, state: ResearchState, claim: Claim, excluded_domains: set[str], own: list[Passage]
+    ) -> list[tuple[Passage, float]]:
         reg = state.registry
-        pool = [p for s in reg.all() if s.fetched and s.domain not in excluded_domains
-                and s.reliability in ("medium", "high") for p in s.passages]
+        pool = [
+            p
+            for s in reg.all()
+            if s.fetched and s.domain not in excluded_domains and s.reliability in ("medium", "high")
+            for p in s.passages
+        ]
         if not pool:
             return []
         ranked = rank_passages(claim.statement, [p.text for p in pool], self.embedder, top_k=8)
@@ -189,7 +201,7 @@ class Verifier:
             if score < self.cfg.evidence_similarity:
                 break
             p = pool[i]
-            if own_vecs is not None:   # reprise du même texte : pas une preuve indépendante
+            if own_vecs is not None:  # reprise du même texte : pas une preuve indépendante
                 v = _unit(self.embedder.embed_documents([p.text]))
                 if float((own_vecs @ v.T).max()) >= self.cfg.duplicate_passage_similarity:
                     continue
@@ -198,8 +210,9 @@ class Verifier:
                 break
         return out
 
-    def _evidence_from_web(self, state: ResearchState, claim: Claim, excluded_domains: set[str],
-                           round_no: int) -> list[tuple[Passage, float]]:
+    def _evidence_from_web(
+        self, state: ResearchState, claim: Claim, excluded_domains: set[str], round_no: int
+    ) -> list[tuple[Passage, float]]:
         a = self.agent
         query = shorten_query(claim.statement)
         state.queries_run.append(query)
@@ -211,7 +224,7 @@ class Verifier:
         candidates: list[Source] = []
         hits = [h for h in hits if not a._is_blocked(h.url)]
         scores = max_similarity([claim.statement], [f"{h.title} — {h.snippet}" for h in hits], self.embedder)
-        for h, score in zip(hits, scores):
+        for h, score in zip(hits, scores, strict=True):
             if score < self.cfg.min_hit_relevance:
                 continue
             src, _ = state.registry.add(h.url, h.title, round_no=round_no, snippet=h.snippet)
@@ -227,7 +240,9 @@ class Verifier:
                 continue
             read += 1
             src.kind, src.reliability = heuristic_reliability(src.domain)
-            for i, score in rank_passages(claim.statement, [p.text for p in passages], self.embedder, top_k=2):
+            for i, score in rank_passages(
+                claim.statement, [p.text for p in passages], self.embedder, top_k=2
+            ):
                 out.append((passages[i], score))
         return out
 
@@ -243,8 +258,12 @@ class Verifier:
             evidence += self._evidence_from_web(state, claim, own_domains, round_no)
             origin = "corpus+web" if evidence else "web"
         if not evidence:
-            verdict = ClaimVerdict(verdict="unverifiable", supporting_passage_ids=[], contradicting_passage_ids=[],
-                                   note="Aucune autre source pertinente trouvée.")
+            verdict = ClaimVerdict(
+                verdict="unverifiable",
+                supporting_passage_ids=[],
+                contradicting_passage_ids=[],
+                note="Aucune autre source pertinente trouvée.",
+            )
             return self._apply(members, verdict, [], origin, reg)
 
         k = min(len(evidence), 3)
@@ -252,11 +271,15 @@ class Verifier:
             shown = [p for p, _ in sorted(evidence, key=lambda e: -e[1])[:k]]
             etext = "\n\n".join(
                 f"[{p.id}] ({reg.get(p.source_id).domain}, fiabilité {reg.get(p.source_id).reliability})\n{p.text}"
-                for p in shown)
+                for p in shown
+            )
             src = reg.get(claim.source_id)
             try:
-                verdict = self.agent._ask(prompts.verification_prompt(claim.statement, f"{src.domain}", etext),
-                                          ClaimVerdict, think=True)
+                verdict = self.agent._ask(
+                    prompts.verification_prompt(claim.statement, f"{src.domain}", etext),
+                    ClaimVerdict,
+                    think=True,
+                )
                 break
             except ContextOverflowError:
                 if k <= 1:
@@ -272,19 +295,27 @@ class Verifier:
         contra = [pid for pid in dict.fromkeys(v.contradicting_passage_ids) if pid in valid]
         status = v.verdict
         if status == "confirmed" and not support:
-            status = "unverifiable"            # « confirmée » sans passage à l'appui : refusé
+            status = "unverifiable"  # « confirmée » sans passage à l'appui : refusé
         if status == "contested" and not contra:
             status = "confirmed" if support else "unverifiable"
         if status == "confirmed" and contra:
-            status = "contested"              # des passages contredisent : c'est une divergence
+            status = "contested"  # des passages contredisent : c'est une divergence
         for c in members:
             c.status = status
             c.supporting_passage_ids = support
             c.contradicting_passage_ids = contra
             c.verification_note = v.note
-        return {"group": members[0].group_id, "claim": members[0].id, "model_verdict": v.verdict,
-                "status": status, "support": support, "contra": contra, "evidence_from": origin,
-                "evidence": [p.id for p in shown], "note": v.note}
+        return {
+            "group": members[0].group_id,
+            "claim": members[0].id,
+            "model_verdict": v.verdict,
+            "status": status,
+            "support": support,
+            "contra": contra,
+            "evidence_from": origin,
+            "evidence": [p.id for p in shown],
+            "note": v.note,
+        }
 
     # --- 5 : divergences entre sources (comparaison par sous-question) -------
 
@@ -323,8 +354,11 @@ class Verifier:
             by_id = {c.id: c for c in claims}
             text = "\n".join(f"{c.id} : {c.statement} [{reg.get(c.source_id).domain}]" for c in claims)
             try:
-                rep = self.agent._ask(prompts.divergence_prompt(state.question, sq.id, sq.question, text),
-                                      DivergenceReport, think=True)
+                rep = self.agent._ask(
+                    prompts.divergence_prompt(state.question, sq.id, sq.question, text),
+                    DivergenceReport,
+                    think=True,
+                )
             except LLMError as exc:
                 log.warning("  comparaison des sources de %s en échec : %s", sq.id, exc)
                 continue
@@ -333,15 +367,22 @@ class Verifier:
                 b = [cid for cid in dict.fromkeys(d.side_b_claim_ids) if cid in by_id and cid not in a]
                 dom_a = {reg.get(by_id[c].source_id).domain for c in a}
                 dom_b = {reg.get(by_id[c].source_id).domain for c in b}
-                if not a or not b or not (dom_a ^ dom_b):   # chaque côté doit exister, sources différentes
+                if not a or not b or not (dom_a ^ dom_b):  # chaque côté doit exister, sources différentes
                     continue
                 src_a = {by_id[c].source_id for c in a}
                 src_b = {by_id[c].source_id for c in b}
                 if any(_same_opposition(src_a, src_b, prev) for prev in seen_oppositions):
-                    continue   # même opposition déjà signalée (souvent répétée d'une sous-question à l'autre)
+                    continue  # même opposition déjà signalée (souvent répétée d'une sous-question à l'autre)
                 seen_oppositions.append((src_a, src_b))
-                found.append({"sub_question_id": sq.id, "point": d.point, "side_a": a, "side_b": b,
-                              "explanation": d.explanation})
+                found.append(
+                    {
+                        "sub_question_id": sq.id,
+                        "point": d.point,
+                        "side_a": a,
+                        "side_b": b,
+                        "explanation": d.explanation,
+                    }
+                )
                 log.info("  ⇄ %s divergence : %s (%s / %s)", sq.id, d.point[:80], ", ".join(a), ", ".join(b))
         state.divergences = found
         return found
@@ -355,8 +396,14 @@ class Verifier:
         sq_order = {sq: i for i, sq in enumerate(state.sub_question_ids())}
         fragile.sort(key=lambda g: self._priority(g, state, sq_order))
         budget = self.cfg.max_claims_to_verify
-        log.info("Vérification : %d affirmations en %d groupes — %d corroborés, %d fragiles (%d vérifiés)",
-                 len(state.claims), len(groups), len(corroborated), len(fragile), min(budget, len(fragile)))
+        log.info(
+            "Vérification : %d affirmations en %d groupes — %d corroborés, %d fragiles (%d vérifiés)",
+            len(state.claims),
+            len(groups),
+            len(corroborated),
+            len(fragile),
+            min(budget, len(fragile)),
+        )
 
         round_no = len(state.decisions) + 1
         results = []
@@ -368,8 +415,21 @@ class Verifier:
                 continue
             results.append(res)
             mark = {"confirmed": "✔", "contested": "⚠", "unverifiable": "?"}[res["status"]]
-            log.info("  %s %s %s (%s) : %s", mark, res["claim"], res["status"], res["evidence_from"],
-                     members[0].statement[:90])
+            log.info(
+                "  %s %s %s (%s) : %s",
+                mark,
+                res["claim"],
+                res["status"],
+                res["evidence_from"],
+                members[0].statement[:90],
+            )
         divergences = self.find_divergences(state)
-        state.log("verification", groups=len(groups), corroborated=len(corroborated), fragile=len(fragile),
-                  verified=results, unchecked=[g[0].id for g in fragile[budget:]], divergences=divergences)
+        state.log(
+            "verification",
+            groups=len(groups),
+            corroborated=len(corroborated),
+            fragile=len(fragile),
+            verified=results,
+            unchecked=[g[0].id for g in fragile[budget:]],
+            divergences=divergences,
+        )

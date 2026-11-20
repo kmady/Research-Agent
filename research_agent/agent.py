@@ -47,8 +47,9 @@ class RoundResult:
 
 
 class ResearchAgent:
-    def __init__(self, config: Config, llm: OllamaLLM, search: SearchProvider, fetcher: Fetcher,
-                 embedder: Embedder) -> None:
+    def __init__(
+        self, config: Config, llm: OllamaLLM, search: SearchProvider, fetcher: Fetcher, embedder: Embedder
+    ) -> None:
         self.cfg = config
         self.llm = llm
         self.search = search
@@ -66,13 +67,15 @@ class ResearchAgent:
     def _ask(self, user: str, schema, *, think: bool):
         return self.llm.structured(
             [{"role": "system", "content": prompts.SYSTEM}, {"role": "user", "content": user}],
-            schema, think=think,
+            schema,
+            think=think,
         )
 
     @staticmethod
     def _sub_questions_text(state: ResearchState, only: list[str] | None = None) -> str:
-        return "\n".join(f"{sq.id} : {sq.question}" for sq in state.plan.sub_questions
-                         if only is None or sq.id in only)
+        return "\n".join(
+            f"{sq.id} : {sq.question}" for sq in state.plan.sub_questions if only is None or sq.id in only
+        )
 
     # --- Étape 1 : plan ------------------------------------------------------
 
@@ -84,8 +87,9 @@ class ResearchAgent:
         plan.sub_questions = plan.sub_questions[:4]
         plan.initial_queries = [clean_query(q) for q in plan.initial_queries if clean_query(q)][:5]
         state.plan = plan
-        state.log("plan", sub_questions=[sq.model_dump() for sq in plan.sub_questions],
-                  queries=plan.initial_queries)
+        state.log(
+            "plan", sub_questions=[sq.model_dump() for sq in plan.sub_questions], queries=plan.initial_queries
+        )
         log.info("Plan : %d sous-questions, %d requêtes", len(plan.sub_questions), len(plan.initial_queries))
         for sq in plan.sub_questions:
             log.info("  %s %s", sq.id, sq.question)
@@ -108,7 +112,7 @@ class ResearchAgent:
             kept = [h for h in hits if not self._is_blocked(h.url)]
             blocked, hits = len(hits) - len(kept), kept
             relevance = self._relevance(state, hits)
-            for h, score in zip(hits, relevance):
+            for h, score in zip(hits, relevance, strict=True):
                 if score < self.cfg.min_hit_relevance:
                     off_topic += 1
                     continue
@@ -116,10 +120,16 @@ class ResearchAgent:
                 if is_new:
                     result.new_source_ids.append(src.id)
                     new += 1
-            notes = ([f"{off_topic} hors sujet"] if off_topic else []) + \
-                    ([f"{blocked} domaines exclus"] if blocked else [])
-            log.info("  « %s » → %d résultats, %d nouvelles sources%s", q, len(hits), new,
-                     f" ({', '.join(notes)})" if notes else "")
+            notes = ([f"{off_topic} hors sujet"] if off_topic else []) + (
+                [f"{blocked} domaines exclus"] if blocked else []
+            )
+            log.info(
+                "  « %s » → %d résultats, %d nouvelles sources%s",
+                q,
+                len(hits),
+                new,
+                f" ({', '.join(notes)})" if notes else "",
+            )
 
     def _relevance(self, state: ResearchState, hits: list) -> list[float]:
         """Pertinence de chaque résultat (titre + extrait) pour la question ou l'une des sous-questions."""
@@ -134,7 +144,9 @@ class ResearchAgent:
 
     # --- Étape 2b : sélection ------------------------------------------------
 
-    def _select(self, state: ResearchState, candidates: list[Source], n: int, focus: list[str]) -> list[Source]:
+    def _select(
+        self, state: ResearchState, candidates: list[Source], n: int, focus: list[str]
+    ) -> list[Source]:
         read_domains = {s.domain for s in state.registry.all() if s.fetched}
         reads_per_domain = Counter(s.domain for s in state.registry.all() if s.fetched)
         cap = self.cfg.max_pages_per_domain
@@ -148,12 +160,19 @@ class ResearchAgent:
         shown = candidates[:20]
         listing = "\n".join(
             f"[{s.id}] {s.title} — {s.domain}{' (domaine déjà lu)' if s.domain in read_domains else ''}"
-            f"\n    {s.snippet[:200]}" for s in shown)
+            f"\n    {s.snippet[:200]}"
+            for s in shown
+        )
         by_id = {s.id: s for s in shown}
         focus_text = self._sub_questions_text(state, focus) if focus else ""
         try:
-            sel = self._ask(prompts.selection_prompt(state.question, self._sub_questions_text(state), listing, n,
-                                                     focus_text), UrlSelection, think=False)
+            sel = self._ask(
+                prompts.selection_prompt(
+                    state.question, self._sub_questions_text(state), listing, n, focus_text
+                ),
+                UrlSelection,
+                think=False,
+            )
             # Une sélection vide est une réponse légitime (« rien de pertinent ») : pas de repli.
             chosen = list(dict.fromkeys(c.source_id for c in sel.selected if c.source_id in by_id))
             reasons = {c.source_id: c.reason for c in sel.selected if c.source_id in by_id}
@@ -188,24 +207,32 @@ class ResearchAgent:
             src.publication_date = res.date[:10]
         return state.registry.set_passages(src.id, chunk_text(res.text, self.cfg.passage_tokens))
 
-    def _best_passages(self, state: ResearchState, passages: list[Passage], k: int, focus: list[str]) -> list[Passage]:
+    def _best_passages(
+        self, state: ResearchState, passages: list[Passage], k: int, focus: list[str]
+    ) -> list[Passage]:
         sqs = [sq.question for sq in state.plan.sub_questions if not focus or sq.id in focus]
-        ranked = rank_passages_multi([state.question, *sqs], [p.text for p in passages], self.embedder, top_k=k)
+        ranked = rank_passages_multi(
+            [state.question, *sqs], [p.text for p in passages], self.embedder, top_k=k
+        )
         # Remis dans l'ordre de la page : plus lisible pour le modèle.
         return sorted((passages[i] for i, _ in ranked), key=lambda p: p.index)
 
     # --- Étape 3 : extraction ------------------------------------------------
 
-    def _extract(self, state: ResearchState, src: Source, passages: list[Passage], round_no: int,
-                 focus: list[str]) -> int:
+    def _extract(
+        self, state: ResearchState, src: Source, passages: list[Passage], round_no: int, focus: list[str]
+    ) -> int:
         header = f"[{src.id}] {src.title} — {src.url} ({src.domain})"
         k = self.cfg.passages_per_call
         while True:
             chosen = self._best_passages(state, passages, k, focus)
             ptext = "\n\n".join(f"[{p.id}] {p.text}" for p in chosen)
             try:
-                ext = self._ask(prompts.extraction_prompt(state.question, self._sub_questions_text(state),
-                                                          header, ptext), Extraction, think=False)
+                ext = self._ask(
+                    prompts.extraction_prompt(state.question, self._sub_questions_text(state), header, ptext),
+                    Extraction,
+                    think=False,
+                )
                 break
             except ContextOverflowError:
                 if k <= 1:
@@ -225,27 +252,51 @@ class ResearchAgent:
         for c in ext.claims[:8]:
             pids = [pid for pid in dict.fromkeys(c.passage_ids) if pid in shown]
             if c.sub_question_id not in valid_sq or not pids or not c.statement.strip():
-                rejected.append({"statement": c.statement, "sub_question_id": c.sub_question_id,
-                                 "passage_ids": c.passage_ids})
+                rejected.append(
+                    {
+                        "statement": c.statement,
+                        "sub_question_id": c.sub_question_id,
+                        "passage_ids": c.passage_ids,
+                    }
+                )
                 continue
             verified = quote_in_passages(c.quote, [shown[p] for p in pids]) if c.quote else False
-            state.add_claim(statement=c.statement.strip(), sub_question_id=c.sub_question_id,
-                            source_id=src.id, passage_ids=pids, quote=c.quote if verified else "",
-                            quote_verified=verified, round_found=round_no)
+            state.add_claim(
+                statement=c.statement.strip(),
+                sub_question_id=c.sub_question_id,
+                source_id=src.id,
+                passage_ids=pids,
+                quote=c.quote if verified else "",
+                quote_verified=verified,
+                round_found=round_no,
+            )
             added += 1
-        state.log("extraction", round=round_no, source=src.id, passages=list(shown), kind=src.kind,
-                  reliability=src.reliability, claims_added=added, rejected=rejected)
+        state.log(
+            "extraction",
+            round=round_no,
+            source=src.id,
+            passages=list(shown),
+            kind=src.kind,
+            reliability=src.reliability,
+            claims_added=added,
+            rejected=rejected,
+        )
         return added
 
     # --- Un tour de recherche ------------------------------------------------
 
-    def research_round(self, state: ResearchState, queries: list[str], round_no: int,
-                       focus: list[str] | None = None) -> RoundResult:
+    def research_round(
+        self, state: ResearchState, queries: list[str], round_no: int, focus: list[str] | None = None
+    ) -> RoundResult:
         focus = focus or []
         t0 = time.time()
         result = RoundResult(round_no=round_no, queries=queries, focus=focus)
-        log.info("Tour %d : %d requêtes%s", round_no, len(queries),
-                 f" (ciblées sur {', '.join(focus)})" if focus else "")
+        log.info(
+            "Tour %d : %d requêtes%s",
+            round_no,
+            len(queries),
+            f" (ciblées sur {', '.join(focus)})" if focus else "",
+        )
         self._search(state, queries, round_no, result)
 
         candidates = [s for s in state.registry.all() if not s.fetched and not s.fetch_error]
@@ -263,13 +314,28 @@ class ResearchAgent:
                 state.log("extraction_error", round=round_no, source=src.id, error=str(exc))
                 continue
             result.claims_added += added
-            log.info("  ✔ %s %s (%s, %s) : %d passages, %d affirmations",
-                     src.id, src.domain, src.kind, src.reliability, len(passages), added)
+            log.info(
+                "  ✔ %s %s (%s, %s) : %d passages, %d affirmations",
+                src.id,
+                src.domain,
+                src.kind,
+                src.reliability,
+                len(passages),
+                added,
+            )
 
         result.seconds = time.time() - t0
-        state.log("round", round=round_no, queries=queries, focus=focus, new_sources=result.new_source_ids,
-                  read=result.read_source_ids, failed=result.failed, claims_added=result.claims_added,
-                  seconds=round(result.seconds, 1))
+        state.log(
+            "round",
+            round=round_no,
+            queries=queries,
+            focus=focus,
+            new_sources=result.new_source_ids,
+            read=result.read_source_ids,
+            failed=result.failed,
+            claims_added=result.claims_added,
+            seconds=round(result.seconds, 1),
+        )
         return result
 
     # --- Étape 4 : évaluation de la suffisance -------------------------------
@@ -278,15 +344,19 @@ class ResearchAgent:
         reg = state.registry
         claims = state.claims_for(sq.id)
         if not claims:
-            return None   # rien à juger : « missing » sans appeler le modèle
+            return None  # rien à juger : « missing » sans appeler le modèle
         lines = []
         for c in claims[:15]:
             s = reg.get(c.source_id)
             lines.append(f"- {c.statement} [{c.source_id}, {s.domain}, fiabilité {s.reliability}]")
         try:
-            return self._ask(prompts.assessment_prompt(state.question, sq.id, sq.question, "\n".join(lines),
-                                                       metrics_text(metrics, self.th)),
-                             SubQuestionAssessment, think=True)
+            return self._ask(
+                prompts.assessment_prompt(
+                    state.question, sq.id, sq.question, "\n".join(lines), metrics_text(metrics, self.th)
+                ),
+                SubQuestionAssessment,
+                think=True,
+            )
         except LLMError as exc:
             log.warning("  Évaluation de %s en échec : %s", sq.id, exc)
             return None
@@ -316,15 +386,25 @@ class ResearchAgent:
         for v in decision.verdicts:
             m = metrics[v.sub_question_id]
             mark = "✔" if v.covered else "…"
-            log.info("  %s %s [%s] %d affirmations, %d domaines fiables — %s", mark, v.sub_question_id,
-                     v.llm_status, m.claims, len(m.reliable_domains), "; ".join(v.reasons))
+            log.info(
+                "  %s %s [%s] %d affirmations, %d domaines fiables — %s",
+                mark,
+                v.sub_question_id,
+                v.llm_status,
+                m.claims,
+                len(m.reliable_domains),
+                "; ".join(v.reasons),
+            )
         log.info("Décision tour %d : %s", decision.round_no, decision.reason)
         if not decision.stop:
             log.info("  Requêtes suivantes : %s", " | ".join(decision.next_queries))
 
-        state.log("assessment", round=last.round_no,
-                  metrics={k: v.__dict__ for k, v in metrics.items()},
-                  llm={k: (a.model_dump() if a is not None else None) for k, a in assessments.items()})
+        state.log(
+            "assessment",
+            round=last.round_no,
+            metrics={k: v.__dict__ for k, v in metrics.items()},
+            llm={k: (a.model_dump() if a is not None else None) for k, a in assessments.items()},
+        )
         state.log("decision", **decision.as_dict())
         state.decisions.append(decision.as_dict())
         return decision
@@ -345,15 +425,25 @@ class ResearchAgent:
             if queries and len(result.search_errors) == len(queries):
                 # Panne du moteur de recherche : ne pas la confondre avec un manque d'information.
                 state.sufficient = False
-                state.stop_reason = (f"arrêt : moteur de recherche indisponible au tour {round_no} "
-                                     f"({result.search_errors[0]})")
+                state.stop_reason = (
+                    f"arrêt : moteur de recherche indisponible au tour {round_no} ({result.search_errors[0]})"
+                )
                 log.error("%s", state.stop_reason)
                 state.log("outage", round=round_no, reason=state.stop_reason)
                 if round_no == 1:
                     break
-                state.decisions.append({"round_no": round_no, "stop": True, "sufficient": False,
-                                        "reason": state.stop_reason, "next_queries": [], "focus": [],
-                                        "verdicts": [], "reliable_sources_read": reliable_sources_read(state)})
+                state.decisions.append(
+                    {
+                        "round_no": round_no,
+                        "stop": True,
+                        "sufficient": False,
+                        "reason": state.stop_reason,
+                        "next_queries": [],
+                        "focus": [],
+                        "verdicts": [],
+                        "reliable_sources_read": reliable_sources_read(state),
+                    }
+                )
                 break
             decision = self.assess(state, result)
             if decision.stop:
@@ -370,19 +460,39 @@ class ResearchAgent:
             log.info("Rédaction de la synthèse")
             Synthesizer(self).run(state)
 
-        state.log("done", seconds=round(time.time() - t0, 1), rounds=round_no, sufficient=state.sufficient,
-                  llm=self.llm.stats.as_dict())
+        state.log(
+            "done",
+            seconds=round(time.time() - t0, 1),
+            rounds=round_no,
+            sufficient=state.sufficient,
+            llm=self.llm.stats.as_dict(),
+        )
         return state
 
 
 def build_agent(cfg: Config, use_cache: bool = True) -> ResearchAgent:
-    llm = OllamaLLM(cfg.ollama_url, cfg.model, num_ctx=cfg.num_ctx, temperature=cfg.temperature,
-                    timeout_s=cfg.llm_timeout_s, max_output_tokens=cfg.max_output_tokens,
-                    max_output_tokens_thinking=cfg.max_output_tokens_thinking, chars_per_token=cfg.chars_per_token)
-    search = SearxngProvider(cfg.searxng_url, min_interval_s=cfg.search_interval_s,
-                             categories=cfg.search_categories, fallback_categories=cfg.search_fallback_categories,
-                             cache=DiskCache(cfg.cache_dir, "search", enabled=use_cache))
-    fetcher = Fetcher(user_agent=cfg.user_agent, timeout_s=cfg.fetch_timeout_s, max_bytes=cfg.max_page_bytes,
-                      cache=DiskCache(cfg.cache_dir, "pages", enabled=use_cache))
+    llm = OllamaLLM(
+        cfg.ollama_url,
+        cfg.model,
+        num_ctx=cfg.num_ctx,
+        temperature=cfg.temperature,
+        timeout_s=cfg.llm_timeout_s,
+        max_output_tokens=cfg.max_output_tokens,
+        max_output_tokens_thinking=cfg.max_output_tokens_thinking,
+        chars_per_token=cfg.chars_per_token,
+    )
+    search = SearxngProvider(
+        cfg.searxng_url,
+        min_interval_s=cfg.search_interval_s,
+        categories=cfg.search_categories,
+        fallback_categories=cfg.search_fallback_categories,
+        cache=DiskCache(cfg.cache_dir, "search", enabled=use_cache),
+    )
+    fetcher = Fetcher(
+        user_agent=cfg.user_agent,
+        timeout_s=cfg.fetch_timeout_s,
+        max_bytes=cfg.max_page_bytes,
+        cache=DiskCache(cfg.cache_dir, "pages", enabled=use_cache),
+    )
     embedder = OllamaEmbedder(cfg.ollama_url, cfg.embed_model)
     return ResearchAgent(cfg, llm, search, fetcher, embedder)

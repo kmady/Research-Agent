@@ -44,13 +44,22 @@ def agent_runner(cfg: Config, reports_dir: Path, *, use_cache: bool = True) -> R
         paths = save_outputs(state, Path(reports_dir) / job_id, meta)
         reg = state.registry
         return Outcome(
-            files={"report": str(paths["Rapport"]), "details": str(paths["Détail"]), "trace": str(paths["Trace"])},
+            files={
+                "report": str(paths["Rapport"]),
+                "details": str(paths["Détail"]),
+                "trace": str(paths["Trace"]),
+            },
             sufficient=state.sufficient,
             stop_reason=state.stop_reason,
             search_outage="moteur de recherche indisponible" in (state.stop_reason or ""),
-            stats={"seconds": round(seconds), "rounds": len(state.decisions),
-                   "sources_read": sum(s.fetched for s in reg.all()), "claims": len(state.claims),
-                   "divergences": len(state.divergences), "model": job_cfg.model},
+            stats={
+                "seconds": round(seconds),
+                "rounds": len(state.decisions),
+                "sources_read": sum(s.fetched for s in reg.all()),
+                "claims": len(state.claims),
+                "divergences": len(state.divergences),
+                "model": job_cfg.model,
+            },
         )
 
     return run

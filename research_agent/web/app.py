@@ -1,6 +1,6 @@
 """Application FastAPI : API REST + progression en direct (SSE) + interface web.
 
-    python -m research_agent.web                 # http://127.0.0.1:8000
+python -m research_agent.web                 # http://127.0.0.1:8000
 """
 
 from __future__ import annotations
@@ -27,8 +27,10 @@ from .settings import WebSettings
 
 STATIC = Path(__file__).parent / "static"
 _SECURITY_HEADERS = {
-    "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-                                "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
@@ -48,20 +50,42 @@ class JobRequest(BaseModel):
 
 def _public(job: dict, manager: JobManager) -> dict:
     """Vue d'une recherche pour l'API : jamais les chemins de fichiers du serveur."""
-    out = {k: job[k] for k in ("id", "question", "options", "status", "progress", "created_at", "started_at",
-                               "finished_at", "error", "sufficient", "search_outage", "stop_reason", "stats")}
+    out = {
+        k: job[k]
+        for k in (
+            "id",
+            "question",
+            "options",
+            "status",
+            "progress",
+            "created_at",
+            "started_at",
+            "finished_at",
+            "error",
+            "sufficient",
+            "search_outage",
+            "stop_reason",
+            "stats",
+        )
+    }
     out["available"] = sorted(job["files"])
     out["queue_position"] = manager.queue_position(job["id"]) if job["status"] == "queued" else None
     return out
 
 
-def create_app(settings: WebSettings | None = None, *, cfg: Config = CONFIG,
-               manager: JobManager | None = None) -> FastAPI:
+def create_app(
+    settings: WebSettings | None = None, *, cfg: Config = CONFIG, manager: JobManager | None = None
+) -> FastAPI:
     settings = settings or WebSettings()
     if manager is None:
-        from .runner import agent_runner   # import tardif : les tests injectent leur propre exécutant
-        manager = JobManager(JobStore(settings.db_path), agent_runner(cfg, settings.reports_dir),
-                             max_queue=settings.max_queue, reports_dir=settings.reports_dir)
+        from .runner import agent_runner  # import tardif : les tests injectent leur propre exécutant
+
+        manager = JobManager(
+            JobStore(settings.db_path),
+            agent_runner(cfg, settings.reports_dir),
+            max_queue=settings.max_queue,
+            reports_dir=settings.reports_dir,
+        )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -69,8 +93,14 @@ def create_app(settings: WebSettings | None = None, *, cfg: Config = CONFIG,
         yield
         manager.stop()
 
-    app = FastAPI(title="Research-Agent", version="0.1.0", lifespan=lifespan,
-                  docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
+    app = FastAPI(
+        title="Research-Agent",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/api/docs",
+        redoc_url=None,
+        openapi_url="/api/openapi.json",
+    )
     app.state.manager = manager
     store = manager.store
 
@@ -86,14 +116,18 @@ def create_app(settings: WebSettings | None = None, *, cfg: Config = CONFIG,
             user, _, pwd = base64.b64decode(header[6:]).decode("utf-8").partition(":")
         except (binascii.Error, UnicodeDecodeError):
             return False
-        return (secrets.compare_digest(user.encode(), settings.user.encode())
-                and secrets.compare_digest(pwd.encode(), settings.password.encode()))
+        return secrets.compare_digest(user.encode(), settings.user.encode()) and secrets.compare_digest(
+            pwd.encode(), settings.password.encode()
+        )
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
         if request.url.path != "/api/health/live" and not _authorized(request):
-            response: Response = JSONResponse({"detail": "authentification requise"}, status_code=401,
-                                              headers={"WWW-Authenticate": 'Basic realm="Research-Agent"'})
+            response: Response = JSONResponse(
+                {"detail": "authentification requise"},
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="Research-Agent"'},
+            )
         else:
             response = await call_next(request)
         for k, v in _SECURITY_HEADERS.items():
@@ -119,14 +153,17 @@ def create_app(settings: WebSettings | None = None, *, cfg: Config = CONFIG,
         if health_cache["value"] and time.time() - health_cache["at"] < 10:
             return health_cache["value"]
         async with httpx.AsyncClient(timeout=3) as client:
+
             async def check(url):
                 try:
                     r = await client.get(url)
                     return r if r.status_code == 200 else None
                 except httpx.HTTPError:
                     return None
-            ollama, searx = await asyncio.gather(check(f"{cfg.ollama_url}/api/tags"),
-                                                 check(f"{cfg.searxng_url}/healthz"))
+
+            ollama, searx = await asyncio.gather(
+                check(f"{cfg.ollama_url}/api/tags"), check(f"{cfg.searxng_url}/healthz")
+            )
         models = {m.get("name") for m in (ollama.json().get("models", []) if ollama else [])}
         value = {
             "ollama": ollama is not None,
@@ -146,8 +183,11 @@ def create_app(settings: WebSettings | None = None, *, cfg: Config = CONFIG,
     @app.post("/api/jobs", status_code=201)
     async def create_job(req: JobRequest):
         if not (settings.min_question_chars <= len(req.question) <= settings.max_question_chars):
-            raise HTTPException(422, f"la question doit faire entre {settings.min_question_chars} et "
-                                     f"{settings.max_question_chars} caractères")
+            raise HTTPException(
+                422,
+                f"la question doit faire entre {settings.min_question_chars} et "
+                f"{settings.max_question_chars} caractères",
+            )
         try:
             job = manager.submit(req.question, {"max_rounds": req.max_rounds, "verify": req.verify})
         except QueueFull as exc:
@@ -209,8 +249,11 @@ def create_app(settings: WebSettings | None = None, *, cfg: Config = CONFIG,
                     idle = 0.0
                     yield ": keep-alive\n\n"
 
-        return StreamingResponse(stream(), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     def _file(job: dict, kind: str) -> Path:
         path = job["files"].get(kind)
