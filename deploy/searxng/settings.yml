@@ -1,7 +1,8 @@
 # Configuration SearXNG pour l'agent de recherche.
 # La clé secrète est lue depuis la variable d'environnement SEARXNG_SECRET (fichier .env).
-# Note : au démarrage, le conteneur attribue ce dossier à son utilisateur interne (uid 977).
-# Pour modifier ce fichier depuis l'hôte : docker cp <fichier> research_agent_searxng:/etc/searxng/settings.yml
+# Ce fichier est intégré à l'image (deploy/searxng/Dockerfile) : après modification,
+# reconstruire avec « docker compose up -d --build searxng ».
+
 use_default_settings: true
 
 general:

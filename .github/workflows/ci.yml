@@ -73,3 +73,8 @@ jobs:
         run: >
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2
           image --quiet --no-progress --severity CRITICAL --ignore-unfixed --exit-code 1 research-agent-web:ci
+      - name: Construire l'image SearXNG (sans la publier)
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/searxng
+          tags: research-agent-searxng:ci
