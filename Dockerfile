@@ -1,6 +1,6 @@
 # Service web de Research-Agent. Le modèle (Ollama) et SearXNG tournent à côté :
 # le conteneur n'embarque ni GPU ni modèle, il orchestre seulement.
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
