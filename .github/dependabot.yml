@@ -12,6 +12,11 @@ updates:
   - package-ecosystem: "docker"        # image de base du Dockerfile
     directory: "/"
     schedule: { interval: "weekly", day: "monday" }
+    ignore:
+      # Changer de version de Python est une décision volontaire (image + CI ensemble).
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
 
   - package-ecosystem: "github-actions" # versions des actions (workflows de l'étape 2)
     directory: "/"
