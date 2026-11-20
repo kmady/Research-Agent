@@ -1,7 +1,7 @@
 # Dependabot : propose des PR de mise à jour des dépendances.
 version: 2
 updates:
-  - package-ecosystem: "pip"           # dépendances de pyproject.toml
+  - package-ecosystem: "uv"            # pyproject.toml + uv.lock
     directory: "/"
     schedule: { interval: "weekly", day: "monday" }
     groups:
