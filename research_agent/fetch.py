@@ -35,6 +35,7 @@ class FetchResult:
 
 # --- Téléchargement ----------------------------------------------------------
 
+
 class Fetcher:
     def __init__(
         self,
@@ -65,10 +66,16 @@ class Fetcher:
         if rp is None:
             rp = RobotFileParser()
             try:
-                r = self.client.get(f"{base}/robots.txt", headers=self.headers,
-                                    timeout=min(5.0, self.timeout_s), follow_redirects=True)
+                r = self.client.get(
+                    f"{base}/robots.txt",
+                    headers=self.headers,
+                    timeout=min(5.0, self.timeout_s),
+                    follow_redirects=True,
+                )
                 if r.status_code >= 400:
-                    rp.allow_all = True  # RFC 9309 : robots.txt indisponible (4xx/5xx) → pas de restriction déclarée
+                    rp.allow_all = (
+                        True  # RFC 9309 : robots.txt indisponible (4xx/5xx) → pas de restriction déclarée
+                    )
                 else:
                     rp.parse(r.text.splitlines())
             except httpx.HTTPError:
@@ -87,8 +94,9 @@ class Fetcher:
             return fail("interdit par robots.txt")
 
         try:
-            with self.client.stream("GET", url, headers=self.headers, timeout=self.timeout_s,
-                                    follow_redirects=True) as r:
+            with self.client.stream(
+                "GET", url, headers=self.headers, timeout=self.timeout_s, follow_redirects=True
+            ) as r:
                 ctype = r.headers.get("content-type", "").split(";")[0].strip().lower()
                 if r.status_code >= 400:
                     return fail(f"HTTP {r.status_code}", ctype)
@@ -116,8 +124,9 @@ class Fetcher:
         if len(text) < self.min_text_chars:
             return fail("texte extrait trop court", ctype)
 
-        result = FetchResult(url=url, ok=True, final_url=final_url, title=title, date=date,
-                             text=text, content_type=ctype)
+        result = FetchResult(
+            url=url, ok=True, final_url=final_url, title=title, date=date, text=text, content_type=ctype
+        )
         if self.cache:
             self.cache.set(url, asdict(result))
         return result
@@ -172,8 +181,9 @@ def _split_long(paragraph: str, max_chars: int) -> list[str]:
     return out
 
 
-def chunk_text(text: str, target_tokens: int = 450, chars_per_token: float = 4.0,
-               min_chars: int = 80) -> list[str]:
+def chunk_text(
+    text: str, target_tokens: int = 450, chars_per_token: float = 4.0, min_chars: int = 80
+) -> list[str]:
     """Découpe un texte en passages d'environ `target_tokens` tokens.
 
     Coupe en priorité entre paragraphes, puis entre phrases, puis entre mots :
@@ -211,13 +221,15 @@ def chunk_text(text: str, target_tokens: int = 450, chars_per_token: float = 4.0
 
 # --- Classement des passages -------------------------------------------------
 
+
 def _unit_rows(vectors: list[list[float]]) -> np.ndarray:
     m = np.asarray(vectors, dtype=np.float32)
     return m / np.clip(np.linalg.norm(m, axis=1, keepdims=True), 1e-12, None)
 
 
-def rank_passages_multi(queries: list[str], passages: list[str], embedder: Embedder,
-                        top_k: int = 5) -> list[tuple[int, float]]:
+def rank_passages_multi(
+    queries: list[str], passages: list[str], embedder: Embedder, top_k: int = 5
+) -> list[tuple[int, float]]:
     """Classe les passages selon leur meilleure similarité avec l'une des requêtes.
 
     Sert à choisir les passages d'une page utiles à *au moins une* sous-question.
@@ -241,6 +253,8 @@ def max_similarity(queries: list[str], texts: list[str], embedder: Embedder) -> 
     return [float(x) for x in (docs @ qs.T).max(axis=1)]
 
 
-def rank_passages(query: str, passages: list[str], embedder: Embedder, top_k: int = 5) -> list[tuple[int, float]]:
+def rank_passages(
+    query: str, passages: list[str], embedder: Embedder, top_k: int = 5
+) -> list[tuple[int, float]]:
     """Renvoie les indices des `top_k` passages les plus proches de la requête, avec leur score cosinus."""
     return rank_passages_multi([query], passages, embedder, top_k)

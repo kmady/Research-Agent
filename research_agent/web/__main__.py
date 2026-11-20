@@ -1,7 +1,7 @@
 """Lancement du service web.
 
-    python -m research_agent.web                          # http://127.0.0.1:8000, sans mot de passe
-    RA_WEB_PASSWORD=... python -m research_agent.web --host 0.0.0.0   # accessible sur le réseau
+python -m research_agent.web                          # http://127.0.0.1:8000, sans mot de passe
+RA_WEB_PASSWORD=... python -m research_agent.web --host 0.0.0.0   # accessible sur le réseau
 """
 
 from __future__ import annotations
@@ -43,12 +43,22 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = WebSettings()
     if not _is_loopback(args.host) and not settings.password:
-        logging.error("Refus de démarrer sur %s sans mot de passe : définissez RA_WEB_PASSWORD "
-                      "(ou restez sur 127.0.0.1).", args.host)
+        logging.error(
+            "Refus de démarrer sur %s sans mot de passe : définissez RA_WEB_PASSWORD "
+            "(ou restez sur 127.0.0.1).",
+            args.host,
+        )
         return 2
     # Un seul processus : la file d'attente et le GPU sont partagés par toutes les requêtes.
-    uvicorn.run(create_app(settings), host=args.host, port=args.port, workers=1,
-                root_path=args.root_path, proxy_headers=True, log_level="info")
+    uvicorn.run(
+        create_app(settings),
+        host=args.host,
+        port=args.port,
+        workers=1,
+        root_path=args.root_path,
+        proxy_headers=True,
+        log_level="info",
+    )
     return 0
 
 

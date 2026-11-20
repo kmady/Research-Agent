@@ -26,8 +26,12 @@ def main() -> None:
     t0 = time.time()
 
     search = SearxngProvider(CONFIG.searxng_url, cache=DiskCache(CONFIG.cache_dir, "search"))
-    fetcher = Fetcher(user_agent=CONFIG.user_agent, timeout_s=CONFIG.fetch_timeout_s,
-                      max_bytes=CONFIG.max_page_bytes, cache=DiskCache(CONFIG.cache_dir, "pages"))
+    fetcher = Fetcher(
+        user_agent=CONFIG.user_agent,
+        timeout_s=CONFIG.fetch_timeout_s,
+        max_bytes=CONFIG.max_page_bytes,
+        cache=DiskCache(CONFIG.cache_dir, "pages"),
+    )
     embedder = OllamaEmbedder(CONFIG.ollama_url, CONFIG.embed_model)
     registry = SourceRegistry()
 

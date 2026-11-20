@@ -45,7 +45,9 @@ def check_fetch(urls: list[str]) -> None:
             r = httpx.get(url, headers=UA, timeout=CONFIG.fetch_timeout_s, follow_redirects=True)
             r.raise_for_status()
         except httpx.HTTPError as exc:
-            print(f"   (ignorée) {url} → {exc.__class__.__name__} {getattr(exc, 'response', None) and exc.response.status_code or ''}")
+            print(
+                f"   (ignorée) {url} → {exc.__class__.__name__} {getattr(exc, 'response', None) and exc.response.status_code or ''}"
+            )
             continue
         text = trafilatura.extract(r.text, url=url) or ""
         if len(text) < 200:
@@ -74,7 +76,12 @@ def check_llm_json() -> None:
             "think": False,
             "format": Capital.model_json_schema(),
             "options": {"num_ctx": CONFIG.num_ctx, "temperature": 0},
-            "messages": [{"role": "user", "content": "Donne la capitale du Japon et sa population approximative en JSON."}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Donne la capitale du Japon et sa population approximative en JSON.",
+                }
+            ],
         },
         timeout=CONFIG.llm_timeout_s,
     )
@@ -103,8 +110,13 @@ def ctx_sweep(values: list[int]) -> None:
     for n in values:
         httpx.post(
             f"{CONFIG.ollama_url}/api/generate",
-            json={"model": CONFIG.model, "prompt": "ok", "stream": False, "think": False,
-                  "options": {"num_ctx": n, "num_predict": 1}},
+            json={
+                "model": CONFIG.model,
+                "prompt": "ok",
+                "stream": False,
+                "think": False,
+                "options": {"num_ctx": n, "num_predict": 1},
+            },
             timeout=CONFIG.llm_timeout_s,
         ).raise_for_status()
         ps = httpx.get(f"{CONFIG.ollama_url}/api/ps", timeout=10).json()["models"]
@@ -125,7 +137,12 @@ def main() -> int:
 
     failures = 0
     urls: list[str] = []
-    for name, fn in [("search", check_search), ("fetch", None), ("llm", check_llm_json), ("embed", check_embed)]:
+    for name, fn in [
+        ("search", check_search),
+        ("fetch", None),
+        ("llm", check_llm_json),
+        ("embed", check_embed),
+    ]:
         try:
             if name == "search":
                 urls = fn()

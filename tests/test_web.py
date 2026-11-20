@@ -15,13 +15,15 @@ from research_agent.web.progress import describe
 from research_agent.web.render import markdown_to_html
 from research_agent.web.settings import WebSettings
 
-REPORT = "# Question\n\n## Réponse courte\n\nRéponse [1].\n\n## Sources\n\n1. [Source](https://a.org/x) — a.org\n"
+REPORT = (
+    "# Question\n\n## Réponse courte\n\nRéponse [1].\n\n## Sources\n\n1. [Source](https://a.org/x) — a.org\n"
+)
 
 
 def fake_runner(reports_dir: Path, *, gate: threading.Event | None = None, fail: bool = False):
     def run(job_id, question, options, emit, should_cancel):
         emit("phase", "Planification de la recherche", 3)
-        if gate is not None:                       # attend un signal, en surveillant l'annulation
+        if gate is not None:  # attend un signal, en surveillant l'annulation
             while not gate.wait(0.02):
                 if should_cancel():
                     raise Cancelled()
@@ -35,14 +37,21 @@ def fake_runner(reports_dir: Path, *, gate: threading.Event | None = None, fail:
             p.write_text(text, encoding="utf-8")
             files[kind] = str(p)
         emit("decision", "Arrêt — suffisant", None)
-        return Outcome(files=files, sufficient=True, stop_reason="suffisant", stats={"seconds": 1, "rounds": 1})
+        return Outcome(
+            files=files, sufficient=True, stop_reason="suffisant", stats={"seconds": 1, "rounds": 1}
+        )
+
     return run
 
 
 def make_client(tmp_path, *, password="", max_queue=10, **runner_kw):
     settings = WebSettings(data_dir=tmp_path, password=password, user="alice", max_queue=max_queue)
-    manager = JobManager(JobStore(settings.db_path), fake_runner(settings.reports_dir, **runner_kw),
-                         max_queue=max_queue, reports_dir=settings.reports_dir)
+    manager = JobManager(
+        JobStore(settings.db_path),
+        fake_runner(settings.reports_dir, **runner_kw),
+        max_queue=max_queue,
+        reports_dir=settings.reports_dir,
+    )
     return TestClient(create_app(settings, manager=manager)), manager
 
 
@@ -62,11 +71,14 @@ def test_job_runs_and_report_is_served(tmp_path):
         r = client.post("/api/jobs", json={"question": "  Quels effets   de la caféine ?  ", "max_rounds": 2})
         assert r.status_code == 201
         job = r.json()
-        assert job["question"] == "Quels effets de la caféine ?" and job["options"] == {"max_rounds": 2, "verify": True}
+        assert job["question"] == "Quels effets de la caféine ?" and job["options"] == {
+            "max_rounds": 2,
+            "verify": True,
+        }
         done = wait_for(client, job["id"], {"done"})
         assert done["sufficient"] is True and done["progress"] == 100
         assert done["available"] == ["details", "report", "trace"]
-        assert "files" not in done and str(tmp_path) not in str(done)   # aucun chemin serveur exposé
+        assert "files" not in done and str(tmp_path) not in str(done)  # aucun chemin serveur exposé
 
         rep = client.get(f"/api/jobs/{job['id']}/report").json()
         assert "<h2>Sources</h2>" in rep["html"] and 'target="_blank"' in rep["html"]
@@ -90,7 +102,7 @@ def test_events_stream_replays_progress_and_ends(tmp_path):
         assert body.rstrip().endswith("event: end\ndata: {}")
         with client.stream("GET", f"/api/jobs/{job['id']}/events", headers={"Last-Event-ID": "3"}) as r:
             resumed = "".join(r.iter_text())
-        assert "Planification" not in resumed       # reprise après le dernier événement reçu
+        assert "Planification" not in resumed  # reprise après le dernier événement reçu
 
 
 def test_question_is_validated(tmp_path):
@@ -98,7 +110,10 @@ def test_question_is_validated(tmp_path):
     with client:
         assert client.post("/api/jobs", json={"question": "court"}).status_code == 422
         assert client.post("/api/jobs", json={"question": "x" * 501}).status_code == 422
-        assert client.post("/api/jobs", json={"question": "Une question valide", "max_rounds": 9}).status_code == 422
+        assert (
+            client.post("/api/jobs", json={"question": "Une question valide", "max_rounds": 9}).status_code
+            == 422
+        )
 
 
 def test_cancel_running_job(tmp_path):
@@ -107,7 +122,7 @@ def test_cancel_running_job(tmp_path):
     with client:
         job = client.post("/api/jobs", json={"question": "Une question à annuler"}).json()
         wait_for(client, job["id"], {"running"})
-        assert client.delete(f"/api/jobs/{job['id']}").status_code == 409     # pas pendant l'exécution
+        assert client.delete(f"/api/jobs/{job['id']}").status_code == 409  # pas pendant l'exécution
         assert client.post(f"/api/jobs/{job['id']}/cancel").status_code == 200
         assert wait_for(client, job["id"], {"cancelled"})["status"] == "cancelled"
         assert client.post(f"/api/jobs/{job['id']}/cancel").status_code == 409
@@ -169,7 +184,7 @@ def test_basic_auth_when_password_is_set(tmp_path):
         assert client.get("/api/jobs", headers={"Authorization": "Basic !!!"}).status_code == 401
         good = base64.b64encode(b"alice:s3cret").decode()
         assert client.get("/api/jobs", headers={"Authorization": f"Basic {good}"}).status_code == 200
-        assert client.get("/api/health/live").status_code == 200    # sonde de vie sans authentification
+        assert client.get("/api/health/live").status_code == 200  # sonde de vie sans authentification
 
 
 def test_ui_and_security_headers(tmp_path):
@@ -196,9 +211,17 @@ def test_progress_messages():
     assert describe(st, {"step": "phase", "name": "plan"})[0] == "phase"
     kind, msg, pct = describe(st, {"step": "round_start", "round": 2, "queries": ["a", "b"]})
     assert kind == "phase" and "Tour de recherche 2 : 2 requêtes" in msg and pct == 30
-    assert "inserm.fr" in describe(st, {"step": "selection", "chosen": [src.id], "candidates": [src.id, "S9"]})[1]
-    assert "inserm.fr — 3 affirmations" in describe(st, {"step": "extraction", "source": src.id, "claims_added": 3})[1]
-    d = describe(st, {"step": "decision", "stop": False, "reason": "Q2 non couverte", "next_queries": ["x y"]})
+    assert (
+        "inserm.fr"
+        in describe(st, {"step": "selection", "chosen": [src.id], "candidates": [src.id, "S9"]})[1]
+    )
+    assert (
+        "inserm.fr — 3 affirmations"
+        in describe(st, {"step": "extraction", "source": src.id, "claims_added": 3})[1]
+    )
+    d = describe(
+        st, {"step": "decision", "stop": False, "reason": "Q2 non couverte", "next_queries": ["x y"]}
+    )
     assert d[0] == "decision" and d[1] == "Recherche complémentaire — Q2 non couverte → x y"
     assert describe(st, {"step": "assessment"}) is None
 
@@ -214,6 +237,7 @@ def test_state_listener_receives_every_logged_event():
 def test_listener_exception_stops_the_agent():
     def stop(state, ev):
         raise Cancelled()
+
     st = ResearchState(question="q", listener=stop)
     with pytest.raises(Cancelled):
         st.log("plan")

@@ -7,8 +7,9 @@ que ces identifiants : il ne peut donc citer que ce qui existe réellement.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _TRACKING_PREFIXES = ("utm_", "fbclid", "gclid", "mc_cid", "mc_eid", "_hs", "yclid")
@@ -26,8 +27,11 @@ def normalize_url(url: str) -> str:
         host = host[4:]
     host = host.removesuffix(":80").removesuffix(":443")
     query = urlencode(
-        sorted((k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
-               if not k.lower().startswith(_TRACKING_PREFIXES))
+        sorted(
+            (k, v)
+            for k, v in parse_qsl(parts.query, keep_blank_values=True)
+            if not k.lower().startswith(_TRACKING_PREFIXES)
+        )
     )
     path = parts.path.rstrip("/")
     return urlunsplit(("https", host, path, query, ""))
@@ -40,9 +44,9 @@ def domain_of(url: str) -> str:
 
 @dataclass
 class Passage:
-    id: str          # "S3:p2"
-    source_id: str   # "S3"
-    index: int       # position dans la page (1, 2, ...)
+    id: str  # "S3:p2"
+    source_id: str  # "S3"
+    index: int  # position dans la page (1, 2, ...)
     text: str
 
 
@@ -53,9 +57,9 @@ class Source:
     title: str
     domain: str
     round_found: int
-    last_seen_round: int = 0       # dernier tour où une requête l'a renvoyée
-    snippet: str = ""              # extrait renvoyé par le moteur de recherche
-    kind: str = "other"            # rempli par l'extraction (étape 4)
+    last_seen_round: int = 0  # dernier tour où une requête l'a renvoyée
+    snippet: str = ""  # extrait renvoyé par le moteur de recherche
+    kind: str = "other"  # rempli par l'extraction (étape 4)
     reliability: str = "medium"
     publication_date: str = ""
     fetched: bool = False
@@ -91,8 +95,15 @@ class SourceRegistry:
             src.last_seen_round = max(src.last_seen_round, round_no)
             return src, False
         sid = f"S{len(self._by_id) + 1}"
-        src = Source(id=sid, url=url, title=title or url, domain=domain_of(url),
-                     round_found=round_no, last_seen_round=round_no, snippet=snippet)
+        src = Source(
+            id=sid,
+            url=url,
+            title=title or url,
+            domain=domain_of(url),
+            round_found=round_no,
+            last_seen_round=round_no,
+            snippet=snippet,
+        )
         self._by_id[sid] = src
         self._by_key[key] = sid
         return src, True
@@ -116,8 +127,10 @@ class SourceRegistry:
         src = self._by_id[source_id]
         for old in src.passages:
             self._passages.pop(old.id, None)
-        src.passages = [Passage(id=f"{source_id}:p{i}", source_id=source_id, index=i, text=t)
-                        for i, t in enumerate(texts, start=1)]
+        src.passages = [
+            Passage(id=f"{source_id}:p{i}", source_id=source_id, index=i, text=t)
+            for i, t in enumerate(texts, start=1)
+        ]
         for p in src.passages:
             self._passages[p.id] = p
         src.fetched = True
@@ -154,18 +167,18 @@ ClaimStatus = Literal["unchecked", "corroborated", "confirmed", "contested", "un
 
 @dataclass
 class Claim:
-    id: str                    # "C1", "C2", ...
+    id: str  # "C1", "C2", ...
     statement: str
-    sub_question_id: str       # "Q1", ...
-    source_id: str             # une affirmation extraite vient toujours d'une seule source
+    sub_question_id: str  # "Q1", ...
+    source_id: str  # une affirmation extraite vient toujours d'une seule source
     passage_ids: list[str]
     quote: str
-    quote_verified: bool       # la citation figure-t-elle réellement dans les passages ?
+    quote_verified: bool  # la citation figure-t-elle réellement dans les passages ?
     round_found: int
     status: ClaimStatus = "unchecked"
     # Vérification croisée (étape 6)
-    group_id: str = ""                                            # affirmations équivalentes d'autres sources
-    independent_origins: int = 0                                  # origines fiables indépendantes du groupe
+    group_id: str = ""  # affirmations équivalentes d'autres sources
+    independent_origins: int = 0  # origines fiables indépendantes du groupe
     supporting_passage_ids: list[str] = field(default_factory=list)
     contradicting_passage_ids: list[str] = field(default_factory=list)
     verification_note: str = ""
@@ -174,22 +187,22 @@ class Claim:
 @dataclass
 class ResearchState:
     question: str
-    plan: Any = None           # schemas.ResearchPlan (évite un import circulaire)
+    plan: Any = None  # schemas.ResearchPlan (évite un import circulaire)
     registry: SourceRegistry = field(default_factory=SourceRegistry)
     claims: list[Claim] = field(default_factory=list)
     queries_run: list[str] = field(default_factory=list)
     trace: list[dict] = field(default_factory=list)
     # Boucle agentique (étape 5)
-    covered: set[str] = field(default_factory=set)        # sous-questions jugées couvertes (définitif)
-    decisions: list[dict] = field(default_factory=list)   # une décision par tour
+    covered: set[str] = field(default_factory=set)  # sous-questions jugées couvertes (définitif)
+    decisions: list[dict] = field(default_factory=list)  # une décision par tour
     sufficient: bool = False
     stop_reason: str = ""
     # Comparaison des sources (étape 6)
     divergences: list[dict] = field(default_factory=list)
     # Synthèse (étape 7)
-    synthesis: Any = None      # synthesis.Synthesis
+    synthesis: Any = None  # synthesis.Synthesis
     # Observateur appelé à chaque étape (progression dans l'interface web) ; hors de la trace exportée.
-    listener: Callable[["ResearchState", dict], None] | None = field(default=None, repr=False, compare=False)
+    listener: Callable[[ResearchState, dict], None] | None = field(default=None, repr=False, compare=False)
 
     def add_claim(self, **kwargs) -> Claim:
         claim = Claim(id=f"C{len(self.claims) + 1}", **kwargs)
@@ -217,4 +230,4 @@ class ResearchState:
         event = {"step": step, **data}
         self.trace.append(event)
         if self.listener is not None:
-            self.listener(self, event)   # peut lever une exception pour interrompre la recherche
+            self.listener(self, event)  # peut lever une exception pour interrompre la recherche

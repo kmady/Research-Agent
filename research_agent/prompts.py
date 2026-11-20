@@ -33,8 +33,12 @@ Tâche : prépare la recherche documentaire.
 
 
 def selection_prompt(question: str, sub_questions: str, candidates: str, n: int, focus: str = "") -> str:
-    focus_block = (f"\nRecherche complémentaire : la priorité va aux sources utiles pour ces sous-questions, "
-                   f"encore insuffisamment couvertes :\n{focus}\n" if focus else "")
+    focus_block = (
+        f"\nRecherche complémentaire : la priorité va aux sources utiles pour ces sous-questions, "
+        f"encore insuffisamment couvertes :\n{focus}\n"
+        if focus
+        else ""
+    )
     return f"""Question de recherche : {question}
 Sous-questions :
 {sub_questions}
@@ -162,8 +166,11 @@ affichés ci-dessus) et explique l'opposition. S'il n'y a pas de divergence, ren
 
 
 def section_prompt(question: str, sq_id: str, sq_text: str, claims: str, divergences: str) -> str:
-    div_block = (f"\nDivergences repérées entre sources sur cette sous-question :\n{divergences}\n"
-                 if divergences else "")
+    div_block = (
+        f"\nDivergences repérées entre sources sur cette sous-question :\n{divergences}\n"
+        if divergences
+        else ""
+    )
     return f"""Question de recherche : {question}
 Sous-question {sq_id} : {sq_text}
 

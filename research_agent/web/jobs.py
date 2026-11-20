@@ -14,10 +14,10 @@ import sqlite3
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,8 @@ class Cancelled(BaseException):
 @dataclass
 class Outcome:
     """Ce que renvoie l'exécution d'une recherche terminée."""
-    files: dict[str, str]                 # report / details / trace → chemin
+
+    files: dict[str, str]  # report / details / trace → chemin
     sufficient: bool
     stop_reason: str
     search_outage: bool = False
@@ -114,8 +115,10 @@ class JobStore:
     def create(self, question: str, options: dict) -> dict:
         job_id = uuid.uuid4().hex
         with self._lock, self._conn() as c:
-            c.execute("INSERT INTO jobs (id, question, options, status, created_at) VALUES (?, ?, ?, ?, ?)",
-                      (job_id, question, json.dumps(options), QUEUED, time.time()))
+            c.execute(
+                "INSERT INTO jobs (id, question, options, status, created_at) VALUES (?, ?, ?, ?, ?)",
+                (job_id, question, json.dumps(options), QUEUED, time.time()),
+            )
         return self.get(job_id)
 
     def get(self, job_id: str) -> dict | None:
@@ -130,7 +133,9 @@ class JobStore:
     def by_status(self, *statuses: str) -> list[dict]:
         marks = ",".join("?" * len(statuses))
         with self._conn() as c:
-            rows = c.execute(f"SELECT * FROM jobs WHERE status IN ({marks}) ORDER BY created_at", statuses).fetchall()
+            rows = c.execute(
+                f"SELECT * FROM jobs WHERE status IN ({marks}) ORDER BY created_at", statuses
+            ).fetchall()
         return [self._row(r) for r in rows]
 
     def update(self, job_id: str, **fields) -> None:
@@ -143,15 +148,21 @@ class JobStore:
 
     def add_event(self, job_id: str, kind: str, message: str) -> int:
         with self._lock, self._conn() as c:
-            seq = c.execute("SELECT COALESCE(MAX(seq), 0) + 1 FROM events WHERE job_id = ?", (job_id,)).fetchone()[0]
-            c.execute("INSERT INTO events (job_id, seq, ts, kind, message) VALUES (?, ?, ?, ?, ?)",
-                      (job_id, seq, time.time(), kind, message))
+            seq = c.execute(
+                "SELECT COALESCE(MAX(seq), 0) + 1 FROM events WHERE job_id = ?", (job_id,)
+            ).fetchone()[0]
+            c.execute(
+                "INSERT INTO events (job_id, seq, ts, kind, message) VALUES (?, ?, ?, ?, ?)",
+                (job_id, seq, time.time(), kind, message),
+            )
         return seq
 
     def events(self, job_id: str, after: int = 0) -> list[dict]:
         with self._conn() as c:
-            rows = c.execute("SELECT seq, ts, kind, message FROM events WHERE job_id = ? AND seq > ? ORDER BY seq",
-                             (job_id, after)).fetchall()
+            rows = c.execute(
+                "SELECT seq, ts, kind, message FROM events WHERE job_id = ? AND seq > ? ORDER BY seq",
+                (job_id, after),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def delete(self, job_id: str) -> None:
@@ -163,7 +174,9 @@ class JobStore:
 class JobManager:
     """Reçoit les demandes et les exécute une par une dans un fil dédié."""
 
-    def __init__(self, store: JobStore, runner: Runner, *, max_queue: int = 10, reports_dir: Path | None = None):
+    def __init__(
+        self, store: JobStore, runner: Runner, *, max_queue: int = 10, reports_dir: Path | None = None
+    ):
         self.store = store
         self.runner = runner
         self.max_queue = max_queue
@@ -177,9 +190,13 @@ class JobManager:
     # --- Cycle de vie --------------------------------------------------------
 
     def start(self) -> None:
-        for job in self.store.by_status(RUNNING):   # arrêt brutal pendant une recherche
-            self.store.update(job["id"], status=FAILED, finished_at=time.time(),
-                              error="interrompue par un redémarrage du service")
+        for job in self.store.by_status(RUNNING):  # arrêt brutal pendant une recherche
+            self.store.update(
+                job["id"],
+                status=FAILED,
+                finished_at=time.time(),
+                error="interrompue par un redémarrage du service",
+            )
             self.store.add_event(job["id"], "warn", "Recherche interrompue par un redémarrage du service")
         self._thread = threading.Thread(target=self._loop, name="research-worker", daemon=True)
         self._thread.start()
@@ -188,7 +205,7 @@ class JobManager:
     def stop(self, timeout: float = 5.0) -> None:
         self._stop.set()
         self._wake.set()
-        with self._cancel_lock:                       # interrompt proprement la recherche en cours
+        with self._cancel_lock:  # interrompt proprement la recherche en cours
             self._cancel.update(j["id"] for j in self.store.by_status(RUNNING))
         if self._thread:
             self._thread.join(timeout)
@@ -258,20 +275,30 @@ class JobManager:
                 self.store.update(job_id, progress=progress)
 
         try:
-            outcome = self.runner(job_id, job["question"], job["options"], emit,
-                                  lambda: self._should_cancel(job_id))
+            outcome = self.runner(
+                job_id, job["question"], job["options"], emit, lambda: self._should_cancel(job_id)
+            )
         except Cancelled:
             self.store.update(job_id, status=CANCELLED, finished_at=time.time())
             self.store.add_event(job_id, "warn", "Recherche annulée")
         except Exception as exc:  # noqa: BLE001 — l'erreur est montrée à l'utilisateur, le service continue
             log.exception("échec de la recherche %s", job_id)
-            self.store.update(job_id, status=FAILED, finished_at=time.time(),
-                              error=f"{type(exc).__name__}: {exc}"[:500])
+            self.store.update(
+                job_id, status=FAILED, finished_at=time.time(), error=f"{type(exc).__name__}: {exc}"[:500]
+            )
             self.store.add_event(job_id, "warn", f"Échec : {type(exc).__name__}: {exc}"[:500])
         else:
-            self.store.update(job_id, status=DONE, finished_at=time.time(), progress=100, files=outcome.files,
-                              sufficient=int(outcome.sufficient), search_outage=int(outcome.search_outage),
-                              stop_reason=outcome.stop_reason, stats=outcome.stats)
+            self.store.update(
+                job_id,
+                status=DONE,
+                finished_at=time.time(),
+                progress=100,
+                files=outcome.files,
+                sufficient=int(outcome.sufficient),
+                search_outage=int(outcome.search_outage),
+                stop_reason=outcome.stop_reason,
+                stats=outcome.stats,
+            )
         finally:
             with self._cancel_lock:
                 self._cancel.discard(job_id)

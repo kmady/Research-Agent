@@ -18,8 +18,12 @@ PAYLOAD = {
 
 
 def make_provider(handler, cache=None):
-    return SearxngProvider("http://searx.test", cache=cache, min_interval_s=0,
-                           client=httpx.Client(transport=httpx.MockTransport(handler)))
+    return SearxngProvider(
+        "http://searx.test",
+        cache=cache,
+        min_interval_s=0,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
 
 
 def test_search_parses_filters_and_deduplicates():
@@ -61,7 +65,7 @@ def test_empty_results_with_failing_engines_is_an_outage_not_an_empty_answer():
     with pytest.raises(SearchError, match="duckduckgo \\(CAPTCHA\\)"):
         provider.search("q")
     empty = make_provider(lambda r: httpx.Response(200, json={"results": [], "unresponsive_engines": []}))
-    assert empty.search("q") == []          # vraiment rien trouvé : pas une erreur
+    assert empty.search("q") == []  # vraiment rien trouvé : pas une erreur
 
 
 def test_search_raises_search_error_on_http_failure():
@@ -72,13 +76,18 @@ def test_search_raises_search_error_on_http_failure():
 
 def test_requests_are_spaced_but_cache_hits_are_not(tmp_path, monkeypatch):
     import research_agent.search as search_mod
+
     sleeps = []
     monkeypatch.setattr(search_mod.time, "sleep", lambda s: sleeps.append(s))
-    provider = SearxngProvider("http://searx.test", min_interval_s=5, cache=DiskCache(tmp_path, "s"),
-                               client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=PAYLOAD))))
+    provider = SearxngProvider(
+        "http://searx.test",
+        min_interval_s=5,
+        cache=DiskCache(tmp_path, "s"),
+        client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=PAYLOAD))),
+    )
     provider.search("a")
-    provider.search("b")      # requête réelle juste après : attente
-    provider.search("a")      # en cache : aucune attente
+    provider.search("b")  # requête réelle juste après : attente
+    provider.search("a")  # en cache : aucune attente
     assert len(sleeps) == 1 and sleeps[0] > 4
 
 
@@ -91,9 +100,15 @@ def fallback_provider(responses, calls, cache=None):
         cat = request.url.params["categories"]
         calls.append(cat)
         return httpx.Response(200, json=responses[cat])
-    return SearxngProvider("http://searx.test", min_interval_s=0, categories="general",
-                           fallback_categories="science", cache=cache,
-                           client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    return SearxngProvider(
+        "http://searx.test",
+        min_interval_s=0,
+        categories="general",
+        fallback_categories="science",
+        cache=cache,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
 
 
 def test_fallback_categories_used_when_general_engines_are_blocked():
@@ -119,7 +134,9 @@ def test_outage_still_reported_when_fallback_is_empty_too():
 
 def test_fallback_results_cached_separately(tmp_path):
     calls = []
-    provider = fallback_provider({"general": OUTAGE, "science": SCIENCE}, calls, cache=DiskCache(tmp_path, "s"))
+    provider = fallback_provider(
+        {"general": OUTAGE, "science": SCIENCE}, calls, cache=DiskCache(tmp_path, "s")
+    )
     provider.search("q")
     provider.search("q")
-    assert calls == ["general", "science", "general"]   # la panne n'est pas mise en cache, le secours oui
+    assert calls == ["general", "science", "general"]  # la panne n'est pas mise en cache, le secours oui

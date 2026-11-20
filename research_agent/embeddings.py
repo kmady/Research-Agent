@@ -40,7 +40,7 @@ class OllamaEmbedder:
     def _embed(self, texts: list[str]) -> list[list[float]]:
         missing = [t for t in dict.fromkeys(texts) if t not in self._memo]
         for i in range(0, len(missing), self.batch_size):
-            batch = missing[i:i + self.batch_size]
+            batch = missing[i : i + self.batch_size]
             r = self.client.post(
                 f"{self.base_url}/api/embed",
                 json={"model": self.model, "input": batch, "truncate": True},
