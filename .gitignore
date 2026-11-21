@@ -8,3 +8,8 @@ reports/*
 .env
 eval/runs/
 data/
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
