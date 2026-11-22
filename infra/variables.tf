@@ -27,3 +27,19 @@ variable "domain_name" {
   description = "Sous-domaine du service, délégué à Route 53 (ex. research.madysystems.ca)"
   type        = string
 }
+
+variable "vpc_cidr" {
+  description = "Plage d'adresses du VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "availability_zones" {
+  description = "Zones utilisées ; la première accueille l'instance GPU et la NAT Gateway"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.availability_zones) >= 2
+    error_message = "Le load balancer exige au moins deux zones."
+  }
+}
