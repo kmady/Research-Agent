@@ -22,3 +22,13 @@ output "private_subnet_id" {
   description = "Sous-réseau privé (instance GPU)"
   value       = aws_subnet.private.id
 }
+
+output "ecr_repository_urls" {
+  description = "Adresses des registres ECR, à utiliser pour docker push et WEB_IMAGE / SEARXNG_IMAGE"
+  value       = { for key, repo in aws_ecr_repository.app : key => repo.repository_url }
+}
+
+output "secret_names" {
+  description = "Noms des secrets dans Secrets Manager (les valeurs se saisissent hors Terraform)"
+  value       = { for key, secret in aws_secretsmanager_secret.app : key => secret.name }
+}
