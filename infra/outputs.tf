@@ -32,3 +32,13 @@ output "secret_names" {
   description = "Noms des secrets dans Secrets Manager (les valeurs se saisissent hors Terraform)"
   value       = { for key, secret in aws_secretsmanager_secret.app : key => secret.name }
 }
+
+output "github_deploy_role_arn" {
+  description = "Rôle à indiquer à aws-actions/configure-aws-credentials (role-to-assume)"
+  value       = aws_iam_role.github_deploy.arn
+}
+
+output "instance_profile_name" {
+  description = "Profil d'instance attaché à l'EC2 GPU"
+  value       = aws_iam_instance_profile.instance.name
+}
