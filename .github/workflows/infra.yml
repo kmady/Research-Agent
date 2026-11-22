@@ -85,6 +85,10 @@ jobs:
       - name: Plan dans le résumé du job
         if: always()
         run: |
+          if [ ! -f plan.txt ]; then
+            echo "Pas de plan : voir l'étape en échec plus haut." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           {
             echo "### Plan Terraform"
             echo
