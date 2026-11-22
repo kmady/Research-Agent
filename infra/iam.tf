@@ -167,3 +167,78 @@ resource "aws_iam_role_policy" "github_deploy" {
   role   = aws_iam_role.github_deploy.id
   policy = data.aws_iam_policy_document.github_deploy.json
 }
+
+# ===================== 3. Rôles de Terraform dans GitHub Actions =====================
+#
+# Deux rôles, pour deux niveaux de confiance (workflow .github/workflows/infra.yml) :
+#   - terraform-plan  : lecture seule, pour le plan affiché sur chaque pull request ;
+#   - terraform-apply : administrateur (Terraform crée des rôles IAM, des réseaux…),
+#     réservé à l'environnement GitHub « infra », qui exige ton approbation et
+#     n'accepte que la branche main.
+# Les PR venant de forks n'obtiennent jamais de jeton OIDC : elles ne peuvent endosser
+# ni l'un ni l'autre.
+
+data "aws_iam_policy_document" "terraform_plan_trust" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_repository}:pull_request"]
+    }
+  }
+}
+
+resource "aws_iam_role" "terraform_plan" {
+  name                 = "${local.name}-terraform-plan"
+  assume_role_policy   = data.aws_iam_policy_document.terraform_plan_trust.json
+  max_session_duration = 3600
+}
+
+# Lecture seule sur tout le compte (y compris le fichier d'état dans S3), sans pouvoir
+# lire la valeur des secrets. Le plan sur PR tourne sans verrou (-lock=false) : ce rôle
+# n'écrit rien, nulle part.
+resource "aws_iam_role_policy_attachment" "terraform_plan" {
+  role       = aws_iam_role.terraform_plan.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+data "aws_iam_policy_document" "terraform_apply_trust" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_repository}:environment:infra"]
+    }
+  }
+}
+
+resource "aws_iam_role" "terraform_apply" {
+  name                 = "${local.name}-terraform-apply"
+  assume_role_policy   = data.aws_iam_policy_document.terraform_apply_trust.json
+  max_session_duration = 3600
+}
+
+resource "aws_iam_role_policy_attachment" "terraform_apply" {
+  role       = aws_iam_role.terraform_apply.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}

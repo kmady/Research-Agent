@@ -1,0 +1,133 @@
+# Terraform dans GitHub Actions.
+#
+#   pull request touchant infra/  → fmt + validate, puis plan (lecture seule) affiché
+#                                   dans le résumé du job
+#   fusion dans main              → plan, puis apply après TON approbation
+#                                   (environnement GitHub « infra »)
+#
+# Authentification par OIDC : aucune clé AWS dans GitHub. Les rôles sont définis dans
+# infra/iam.tf (section 3).
+
+name: Infra
+
+on:
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  push:
+    branches: [main]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  workflow_dispatch: # lancement manuel (onglet Actions)
+
+permissions:
+  contents: read
+
+# Jamais deux exécutions Terraform en même temps, et jamais d'annulation en cours d'apply.
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.17.2"
+  AWS_REGION: ca-central-1
+  AWS_ACCOUNT_ID: "034565845674"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  # Valeur non publiée dans le dépôt (voir envs/prod.local.tfvars.example).
+  TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+
+defaults:
+  run:
+    working-directory: infra
+
+jobs:
+  check:
+    name: Format et validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  plan:
+    name: Plan
+    needs: check
+    # PR de ce dépôt seulement : une PR venant d'un fork ou de Dependabot n'a pas de
+    # jeton OIDC et ne lance pas de plan.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # demander un jeton OIDC à GitHub
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/research-agent-prod-terraform-plan
+          aws-region: ${{ env.AWS_REGION }}
+      - run: terraform init
+      - name: terraform plan
+        # -lock=false : le rôle est en lecture seule et ne peut pas poser le verrou.
+        run: terraform plan -var-file=envs/prod.tfvars -lock=false -no-color | tee plan.txt
+      - name: Plan dans le résumé du job
+        if: always()
+        run: |
+          {
+            echo "### Plan Terraform"
+            echo
+            grep -E '^(Plan:|No changes\.)' plan.txt || echo "Plan incomplet : voir les journaux."
+            echo
+            echo "<details><summary>Plan complet</summary>"
+            echo
+            echo '```'
+            cat plan.txt
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: Apply
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # L'environnement « infra » exige ton approbation avant que le job ne démarre.
+    environment: infra
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/research-agent-prod-terraform-apply
+          aws-region: ${{ env.AWS_REGION }}
+      - run: terraform init
+      - name: terraform plan
+        run: terraform plan -var-file=envs/prod.tfvars -lock-timeout=5m -no-color -out=tfplan | tee plan.txt
+      - name: Plan dans le résumé du job
+        run: |
+          {
+            echo "### Plan appliqué"
+            echo
+            grep -E '^(Plan:|No changes\.)' plan.txt || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: terraform apply
+        run: terraform apply -lock-timeout=5m -no-color tfplan
