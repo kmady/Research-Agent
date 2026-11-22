@@ -167,7 +167,7 @@ Ce qui n'est **pas** dans la CI : l'évaluation réelle (`scripts/evaluate.py`).
 | `alb.tf` | Load balancer, groupe cible :8000, contrôle de santé sur `/api/health/live`, redirection HTTP vers HTTPS |
 | `dns.tf` | Certificat ACM validé par DNS, enregistrement Route 53 |
 | `iam.tf` | Rôle de l'instance (SSM, lecture ECR, lecture des secrets, CloudWatch) ; rôle GitHub OIDC (section 4) |
-| `ecr.tf` | Dépôt `research-agent-web`, scan au push, cycle de vie |
+| `ecr.tf` | Dépôts `research-agent-web` et `research-agent-searxng`, tags immuables, scan au push, cycle de vie |
 | `secrets.tf` | Conteneurs de secrets, **sans les valeurs** : elles sont saisies hors de Terraform |
 | `schedule.tf` | Démarrage le matin, arrêt propre le soir (section 5) |
 | `monitoring.tf` | Groupes de journaux (rétention 30 jours), alarmes, sujet SNS pour les alertes par e-mail |
