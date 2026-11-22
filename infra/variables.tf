@@ -43,3 +43,13 @@ variable "availability_zones" {
     error_message = "Le load balancer exige au moins deux zones."
   }
 }
+
+variable "github_repository" {
+  description = "Dépôt GitHub autorisé à déployer (propriétaire/nom)"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
+    error_message = "Format attendu : propriétaire/nom."
+  }
+}
