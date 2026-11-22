@@ -52,3 +52,8 @@ output "data_volume_id" {
   description = "Volume EBS /data"
   value       = aws_ebs_volume.data.id
 }
+
+output "app_url" {
+  description = "Adresse publique du service"
+  value       = "https://${var.domain_name}"
+}
