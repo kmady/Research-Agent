@@ -57,3 +57,8 @@ output "app_url" {
   description = "Adresse publique du service"
   value       = "https://${var.domain_name}"
 }
+
+output "log_group" {
+  description = "Groupe de journaux CloudWatch des conteneurs"
+  value       = aws_cloudwatch_log_group.app.name
+}
