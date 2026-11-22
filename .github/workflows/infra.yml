@@ -38,6 +38,9 @@ env:
 defaults:
   run:
     working-directory: infra
+    # « shell: bash » explicite = bash -eo pipefail : dans « terraform plan | tee », un échec
+    # de terraform fait échouer l'étape (sans pipefail, seul le code de tee compterait).
+    shell: bash
 
 jobs:
   check:
