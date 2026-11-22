@@ -42,3 +42,13 @@ output "instance_profile_name" {
   description = "Profil d'instance attaché à l'EC2 GPU"
   value       = aws_iam_instance_profile.instance.name
 }
+
+output "instance_id" {
+  description = "Instance GPU (pour Session Manager : aws ssm start-session --target <id>)"
+  value       = aws_instance.gpu.id
+}
+
+output "data_volume_id" {
+  description = "Volume EBS /data"
+  value       = aws_ebs_volume.data.id
+}

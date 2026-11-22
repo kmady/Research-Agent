@@ -5,8 +5,8 @@
 #   2. le rôle de GitHub Actions : ce que la CI a le droit de faire, sans aucune clé AWS
 #      stockée dans GitHub (connexion par OIDC).
 #
-# Les droits sont ajoutés couche par couche : le déploiement par SSM (5.5) et
-# l'écriture des journaux CloudWatch (5.7) viendront avec les ressources concernées.
+# Les droits sont ajoutés couche par couche : l'écriture des journaux CloudWatch (5.7)
+# viendra avec les groupes de journaux.
 
 # ===================== 1. Rôle de l'instance GPU =====================
 
@@ -136,6 +136,29 @@ data "aws_iam_policy_document" "github_deploy" {
       "ecr:PutImage",
     ]
     resources = [for repo in aws_ecr_repository.app : repo.arn]
+  }
+
+  # Déployer : lancer un script sur NOTRE instance seulement, via SSM Run Command,
+  # avec le document standard AWS-RunShellScript.
+  statement {
+    sid     = "DeployRunCommand"
+    actions = ["ssm:SendCommand"]
+    resources = [
+      aws_instance.gpu.arn,
+      "arn:aws:ssm:${var.region}::document/AWS-RunShellScript",
+    ]
+  }
+
+  # Suivre le résultat de la commande et retrouver l'instance. Ces actions de lecture
+  # n'acceptent pas de restriction de ressource.
+  statement {
+    sid = "DeployRead"
+    actions = [
+      "ssm:GetCommandInvocation",
+      "ssm:ListCommandInvocations",
+      "ec2:DescribeInstances",
+    ]
+    resources = ["*"]
   }
 }
 

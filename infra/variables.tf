@@ -53,3 +53,20 @@ variable "github_repository" {
     error_message = "Format attendu : propriétaire/nom."
   }
 }
+
+variable "instance_type" {
+  description = "Type d'instance GPU"
+  type        = string
+  default     = "g4dn.xlarge" # T4 16 Go ; g6.xlarge (L4 24 Go) est plus rapide et plus chère
+
+  validation {
+    condition     = contains(["g4dn.xlarge", "g6.xlarge"], var.instance_type)
+    error_message = "Types prévus : g4dn.xlarge ou g6.xlarge (quota GPU : 4 vCPU)."
+  }
+}
+
+variable "data_volume_size" {
+  description = "Taille du volume /data, en Go"
+  type        = number
+  default     = 100
+}
