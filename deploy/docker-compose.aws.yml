@@ -1,0 +1,21 @@
+# Complément AWS de docker-compose.prod.yml : journaux des conteneurs vers CloudWatch.
+# Utilisé seulement sur l'instance EC2 (bootstrap.sh) ; le test local s'en passe.
+#
+#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.aws.yml …
+#
+# Le démon Docker écrit avec le rôle IAM de l'instance (droit limité à ce groupe).
+
+x-awslogs: &awslogs
+  driver: awslogs
+  options:
+    awslogs-region: ca-central-1
+    awslogs-group: /research-agent/prod  # créé par Terraform (monitoring.tf), rétention 30 jours
+    tag: "{{.Name}}"                     # un flux par conteneur
+
+services:
+  ollama:
+    logging: *awslogs
+  searxng:
+    logging: *awslogs
+  web:
+    logging: *awslogs
