@@ -39,15 +39,16 @@ log "Volume de données"
 # Le disque local de la g4dn (éphémère) n'y figure pas. On écarte le disque système.
 root_disk="/dev/$(lsblk -no PKNAME "$(findmnt -no SOURCE /)")"
 candidates=()
-for link in /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol*; do
-  [[ "$link" == *-part* ]] && continue
-  dev="$(readlink -f "$link")"
+# Disques entiers (-d), un par ligne, chemin complet (-p) : pas de doublon, contrairement
+# à /dev/disk/by-id qui donne deux liens par volume.
+while read -r dev model; do
+  [ "$model" = "Amazon Elastic Block Store" ] || continue
   [ "$dev" = "$root_disk" ] && continue
   candidates+=("$dev")
-done
+done < <(lsblk -dnpo NAME,MODEL)
 [ "${#candidates[@]}" -eq 1 ] || die "attendu 1 volume EBS de données, trouvé ${#candidates[@]} : ${candidates[*]:-aucun}"
 data_dev="${candidates[0]}"
-echo "Volume : $data_dev"
+echo "Volume : $data_dev ($(lsblk -dno SERIAL,SIZE "$data_dev"))"
 
 if [ -z "$(blkid -o value -s TYPE "$data_dev" || true)" ]; then
   echo "Aucun système de fichiers : formatage (première utilisation)"
