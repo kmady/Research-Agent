@@ -53,7 +53,7 @@ Ce document décrit comment mettre Research-Agent en production sur AWS, à part
 | Images | Amazon ECR | Images du service web, avec un cycle de vie (20 dernières conservées) |
 | Secrets | Secrets Manager | `RA_WEB_PASSWORD`, `SEARXNG_SECRET`, clé d'API de recherche |
 | Accès administrateur | SSM Session Manager | Aucun port SSH, aucune clé SSH |
-| Planification | EventBridge Scheduler et SSM Automation | Démarrage le matin, arrêt propre le soir |
+| Planification | EventBridge Scheduler et SSM Run Command | Lundi au vendredi 8 h - 20 h (America/Toronto) : démarrage, arrêt propre après les recherches en cours, arrêt forcé à 21 h 15 |
 | Observation | CloudWatch Logs, alarmes, AWS Budgets | Journaux, alertes de santé et de coût |
 | Sauvegarde | Data Lifecycle Manager | Snapshot quotidien du volume `/data`, conservé 7 jours |
 | Sortie Internet | NAT Gateway | Accès aux moteurs de recherche et aux pages web depuis le sous-réseau privé |

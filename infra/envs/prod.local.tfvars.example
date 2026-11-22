@@ -1,0 +1,3 @@
+# Copier en prod.local.tfvars (ignoré par Git) et remplir.
+# Valeurs personnelles qui ne doivent pas être publiées dans le dépôt public.
+alert_email = "adresse@exemple.ca"

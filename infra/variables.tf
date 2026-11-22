@@ -70,3 +70,20 @@ variable "data_volume_size" {
   type        = number
   default     = 100
 }
+
+variable "schedule_timezone" {
+  description = "Fuseau horaire des démarrages et arrêts planifiés"
+  type        = string
+  default     = "America/Toronto"
+}
+
+variable "alert_email" {
+  description = "Adresse qui reçoit les alertes. Donnée dans envs/prod.local.tfvars (non versionné)."
+  type        = string
+  sensitive   = true # masquée dans les sorties de plan et d'apply
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "Adresse courriel invalide."
+  }
+}
