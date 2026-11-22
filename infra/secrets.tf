@@ -11,6 +11,9 @@ locals {
   secrets = {
     "RA_WEB_PASSWORD" = "Mot de passe de l'authentification Basic de l'interface web"
     "SEARXNG_SECRET"  = "Clé secrète de SearXNG (chaîne aléatoire)"
+    # Pas un secret, mais une donnée personnelle (contact envoyé aux sites consultés) :
+    # elle ne doit pas figurer dans le dépôt public.
+    "RA_USER_AGENT" = "Contact public envoyé aux sites consultés (User-Agent)"
   }
 }
 
