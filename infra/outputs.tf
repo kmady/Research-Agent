@@ -62,3 +62,11 @@ output "log_group" {
   description = "Groupe de journaux CloudWatch des conteneurs"
   value       = aws_cloudwatch_log_group.app.name
 }
+
+output "terraform_ci_role_arns" {
+  description = "Rôles endossés par .github/workflows/infra.yml"
+  value = {
+    plan  = aws_iam_role.terraform_plan.arn
+    apply = aws_iam_role.terraform_apply.arn
+  }
+}

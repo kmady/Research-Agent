@@ -87,3 +87,13 @@ variable "alert_email" {
     error_message = "Adresse courriel invalide."
   }
 }
+
+variable "github_owner_id" {
+  description = "Identifiant numérique du propriétaire du dépôt GitHub (immuable)"
+  type        = string
+}
+
+variable "github_repository_id" {
+  description = "Identifiant numérique du dépôt GitHub (immuable)"
+  type        = string
+}
