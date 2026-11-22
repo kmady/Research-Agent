@@ -161,7 +161,7 @@ Ce qui n'est **pas** dans la CI : l'évaluation réelle (`scripts/evaluate.py`).
 
 | Fichier | Ressources |
 |---|---|
-| `network.tf` | VPC ; 2 sous-réseaux publics (load balancer) et 1 privé (instance) ; NAT Gateway ; points de terminaison VPC pour SSM, ECR et S3 |
+| `network.tf` | VPC ; 2 sous-réseaux publics (load balancer) et 1 privé (instance) ; NAT Gateway ; point de terminaison S3 (gateway, gratuit). Pas de points de terminaison « interface » (SSM, ECR) : la NAT suffit, et ils coûteraient environ 8 $ par mois chacun |
 | `compute.tf` | EC2 GPU, IMDSv2 obligatoire, volume racine chiffré, user-data qui lance `bootstrap.sh` |
 | `storage.tf` | Volume EBS gp3 `/data` chiffré, avec `prevent_destroy` ; politique de snapshots |
 | `alb.tf` | Load balancer, groupe cible :8000, contrôle de santé sur `/api/health/live`, redirection HTTP vers HTTPS |
