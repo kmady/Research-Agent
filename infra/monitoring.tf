@@ -61,6 +61,12 @@ resource "aws_cloudwatch_metric_alarm" "no_healthy_target" {
 
   alarm_actions = [aws_sns_topic.alerts.arn]
   ok_actions    = [aws_sns_topic.alerts.arn] # un courriel aussi au retour à la normale
+
+  # Le planificateur (schedule.tf) active et désactive ces actions chaque jour :
+  # Terraform ne doit pas les réactiver à chaque apply (sinon alertes la nuit).
+  lifecycle {
+    ignore_changes = [actions_enabled]
+  }
 }
 
 # Erreurs 5xx en série (application en erreur ou injoignable).
@@ -81,6 +87,12 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   }
 
   alarm_actions = [aws_sns_topic.alerts.arn]
+
+  # Le planificateur (schedule.tf) active et désactive ces actions chaque jour :
+  # Terraform ne doit pas les réactiver à chaque apply (sinon alertes la nuit).
+  lifecycle {
+    ignore_changes = [actions_enabled]
+  }
 }
 
 # La machine elle-même est malade (contrôles matériels ou système d'exploitation).
